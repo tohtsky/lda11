@@ -42,6 +42,7 @@ class LDA(object):
         self.topic_word_prior = topic_word_prior
         self.n_vocabs = None
         self.docstate_ = None
+        self.components_ = None
 
     def fit(self, X, n_iter=1000):
 
@@ -52,7 +53,7 @@ class LDA(object):
         result /= result.sum(axis=1)[:, np.newaxis]
         return result 
 
-    def _fit(self, X, n_iter=1000, ll_freq=5):
+    def _fit(self, X, n_iter=1000, ll_freq=10):
         self.doc_topic_prior = number_to_array(
             self.n_components, 1 / float(self.n_components), 
             self.doc_topic_prior
@@ -78,7 +79,7 @@ class LDA(object):
         docstate.initialize( doc_topic, word_topic )
 
         topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
-        self.components = word_topic.transpose()
+        self.components_ = word_topic.transpose()
 
         ll = docstate.log_likelihood(
             self.doc_topic_prior,
@@ -87,22 +88,24 @@ class LDA(object):
             word_topic,
             topic_counts
         )
-        for i in tqdm(range(n_iter)):
-            docstate.iterate_gibbs(
-                self.doc_topic_prior,
-                self.topic_word_prior,
-                doc_topic,
-                word_topic,
-                topic_counts
-            )
-            if ( i + 1) % ll_freq == 0:
-                ll = docstate.log_likelihood(
+        with tqdm(range(n_iter)) as pbar:
+            pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
+            for i in pbar:
+                docstate.iterate_gibbs(
                     self.doc_topic_prior,
                     self.topic_word_prior,
                     doc_topic,
                     word_topic,
                     topic_counts
                 )
-                print(ll)
+                if ( i + 1) % ll_freq == 0:
+                    ll = docstate.log_likelihood(
+                        self.doc_topic_prior,
+                        self.topic_word_prior,
+                        doc_topic,
+                        word_topic,
+                        topic_counts
+                    )
+                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
 
         return doc_topic

@@ -126,7 +126,6 @@ Real DocState::log_likelihood(
             ll -= std::lgamma(exponent.sum());
         }
     }
-    std::cout << ll << std::endl;
     {
         RealArray exponent(n_words); 
         for (size_t j = 0; j < n_topics_; j++) {

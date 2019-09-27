@@ -17,6 +17,7 @@ using IndexVector = Eigen::Matrix<
 >;
 
 using RealVector = Eigen::Matrix <Real, Eigen::Dynamic, 1>;
+using RealArray = Eigen::Array <Real, Eigen::Dynamic, 1>;
 
 struct WordState {
     inline WordState (size_t doc_id, size_t word_id, size_t topic_id):

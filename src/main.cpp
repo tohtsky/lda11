@@ -21,6 +21,7 @@ PYBIND11_MODULE(_lda, m) {
               >())
         .def("initialize", &DocState::initialize_count)
         .def("iterate_gibbs", &DocState::iterate_gibbs) 
+        .def("log_likelihood", &DocState::log_likelihood) 
     ;
 
 }

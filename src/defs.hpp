@@ -4,6 +4,7 @@
 
 using Real = double;
 using Integer = int32_t;
+
 using IntegerMatrix = Eigen::Matrix<
     Integer, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor
 >;
@@ -15,8 +16,7 @@ using IndexVector = Eigen::Matrix<
     size_t, Eigen::Dynamic, 1
 >;
 
-
-
+using RealVector = Eigen::Matrix <Real, Eigen::Dynamic, 1>;
 
 struct WordState {
     inline WordState (size_t doc_id, size_t word_id, size_t topic_id):

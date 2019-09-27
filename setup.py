@@ -6,7 +6,7 @@ from distutils.command.clean import clean as Clean
 import os
 __version__ = '0.0.1'
 
-install_requires = ['pybind11>=2.4', 'numpy >= 1.11']
+install_requires = ['pybind11>=2.4', 'numpy >= 1.11', 'tqdm']
 
 eigen_include_dir = os.environ.get('EIGEN3_INCLUDE_DIR', None)
 if eigen_include_dir is None:
@@ -55,7 +55,7 @@ class get_pybind_include(object):
 ext_modules = [
     Extension(
         'lda11._lda',
-        ['src/main.cpp'],
+        ['src/main.cpp', 'src/state.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
@@ -100,7 +100,7 @@ class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
     c_opts = {
         'msvc': ['/EHsc'],
-        'unix': [],
+        'unix': ['-march=native'],
     }
     l_opts = {
         'msvc': [],

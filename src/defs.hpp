@@ -16,6 +16,7 @@ using IndexVector = Eigen::Matrix<
     size_t, Eigen::Dynamic, 1
 >;
 
+using RealMatrix = Eigen::Matrix <Real, Eigen::Dynamic, Eigen::Dynamic>; 
 using RealVector = Eigen::Matrix <Real, Eigen::Dynamic, 1>;
 using RealArray = Eigen::Array <Real, Eigen::Dynamic, 1>;
 

@@ -3,8 +3,24 @@
 #include <vector> 
 #include <random> 
 #include <cmath>
-#include "Eigen/Core" 
+#include <Eigen/Core> 
+#include <unsupported/Eigen/SpecialFunctions>
+
 #include "./defs.hpp"
+
+struct UrandDevice {
+    inline UrandDevice(int random_seed):
+        random_state_(random_seed), udist_(0.0, 1.0){}
+
+    inline Real rand() {
+        return udist_(random_state_);
+    }
+
+    private:
+
+    std::mt19937 random_state_;
+    std::uniform_real_distribution<Real> udist_; 
+};
 
 
 struct DocState {
@@ -30,21 +46,43 @@ struct DocState {
     ); 
 
     Real log_likelihood (
-        Eigen::Ref<RealVector> doc_topic_prior,
         Eigen::Ref<RealVector> topic_word_prior, 
-        Eigen::Ref<IntegerMatrix> doc_topic, 
-        Eigen::Ref<IntegerMatrix> word_topic,
-        Eigen::Ref<IntegerVector> topic_counts 
+        Eigen::Ref<IntegerMatrix> word_topic
     );
 
     private:
-    Real rand ();
-
     std::vector<WordState> word_states;
     const std::size_t n_topics_;
     std::mt19937 random_state_;
-    std::uniform_real_distribution<Real> udist_; 
-
+    UrandDevice urand_;
 };
+
+struct Predictor {
+    Predictor(
+        size_t n_topics,
+        int random_seed = 42
+    );
+
+    void add_beta(RealMatrix beta);
+
+    void predict(
+        Eigen::Ref<IntegerVector> result,
+        std::vector<IntegerVector> nonzeros,
+        std::vector<IntegerVector> counts,
+        std::size_t iter
+    );
+
+    private:
+
+    const std::size_t n_topics_; 
+    std::size_t n_domains_;
+    std::vector<RealMatrix> betas_;
+    UrandDevice urand_; 
+};
+
+Real log_likelihood_doc_topic(
+    Eigen::Ref<RealVector> doc_topic_prior,
+    Eigen::Ref<IntegerMatrix> doc_topic
+);
 
 #endif

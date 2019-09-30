@@ -22,9 +22,8 @@ struct UrandDevice {
     std::uniform_real_distribution<Real> udist_; 
 };
 
-
-struct DocState {
-    DocState (
+struct LDATrainerBase {
+    LDATrainerBase (
         Eigen::Ref<IntegerVector> counts,
         Eigen::Ref<IndexVector> dixs,
         Eigen::Ref<IndexVector> wixs,
@@ -38,12 +37,15 @@ struct DocState {
     );
 
     void iterate_gibbs(
-        Eigen::Ref<RealVector> doc_topic_prior,
         Eigen::Ref<RealVector> topic_word_prior, 
         Eigen::Ref<IntegerMatrix> doc_topic, 
         Eigen::Ref<IntegerMatrix> word_topic,
         Eigen::Ref<IntegerVector> topic_counts 
     ); 
+
+    virtual const RealVector & doc_topic_prior(
+        size_t doc_index
+    ) = 0;
 
     Real log_likelihood (
         Eigen::Ref<RealVector> topic_word_prior, 
@@ -55,6 +57,44 @@ struct DocState {
     const std::size_t n_topics_;
     std::mt19937 random_state_;
     UrandDevice urand_;
+};
+
+struct LDATrainer: LDATrainerBase {
+    LDATrainer (
+        const RealVector & doc_topic_prior,
+        Eigen::Ref<IntegerVector> counts,
+        Eigen::Ref<IndexVector> dixs,
+        Eigen::Ref<IndexVector> wixs,
+        size_t n_topics,
+        int random_seed=42 
+    );
+
+    virtual const RealVector & doc_topic_prior(
+        size_t doc_index
+    ) override;
+    private:
+    RealVector doc_topic_prior_;
+};
+
+struct LabelledLDATrainer :LDATrainerBase {
+    LabelledLDATrainer(
+        Real alpha,
+        Real epsilon,
+        const IntegerMatrix & Labels,
+        Eigen::Ref<IntegerVector> counts,
+        Eigen::Ref<IndexVector> dixs,
+        Eigen::Ref<IndexVector> wixs,
+        size_t n_topics,
+        int random_seed=42 
+    );
+
+    virtual const RealVector & doc_topic_prior(
+        size_t doc_index
+    ) override;
+
+    private:
+    Real alpha_, epsilon_;
+    IntegerMatrix labels_;
 };
 
 struct Predictor {

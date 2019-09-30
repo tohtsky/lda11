@@ -12,18 +12,39 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(_lda, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
-    py::class_<DocState>(m, "DocState")
+    py::class_<LDATrainer>(m, "LDATrainer")
         .def(py::init< 
+                const RealVector &, 
                 Eigen::Ref<IntegerVector>, 
                 Eigen::Ref<IndexVector>,
                 Eigen::Ref<IndexVector>,
                 const size_t,
                 int 
               >())
-        .def("initialize", &DocState::initialize_count)
-        .def("iterate_gibbs", &DocState::iterate_gibbs) 
-        .def("log_likelihood", &DocState::log_likelihood) 
+        .def("initialize", &LDATrainer::initialize_count)
+        .def("iterate_gibbs", &LDATrainer::iterate_gibbs) 
+        .def("log_likelihood", &LDATrainer::log_likelihood) 
     ;
+
+    py::class_<LabelledLDATrainer>(m, "LabelledLDATrainer")
+        .def(py::init<
+                Real,
+                Real, 
+                const IntegerMatrix &, 
+                Eigen::Ref<IntegerVector>, 
+                Eigen::Ref<IndexVector>,
+                Eigen::Ref<IndexVector>,
+                const size_t,
+                int 
+              >())
+        .def("initialize", &LDATrainer::initialize_count)
+        .def("iterate_gibbs", &LDATrainer::iterate_gibbs) 
+        .def("log_likelihood", &LDATrainer::log_likelihood) 
+    ;
+    m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
+
+
+
     m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
 
     py::class_<Predictor>(m, "Predictor")

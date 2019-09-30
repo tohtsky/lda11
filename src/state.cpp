@@ -1,8 +1,8 @@
 #include "./state.hpp"
 #include "iostream"
 
-inline size_t binary_search(const std::vector<Real> & array, Real value) {
-    int lower = 0, upper = array.size() -1; 
+inline size_t binary_search(const Real* array, size_t size, Real value ) {
+    int lower = 0, upper = size -1; 
     int half = 0;
     int idx = -1;
     while (upper >= lower){
@@ -22,9 +22,43 @@ inline size_t binary_search(const std::vector<Real> & array, Real value) {
         return static_cast<size_t>(lower);
 
     return static_cast<size_t>(idx);
+
 }
 
-DocState::DocState (
+inline size_t binary_search(const std::vector<Real> & array, Real value) {
+    return binary_search(array.data(), array.size(), value);
+}
+
+inline size_t binary_search(const RealVector & array, Real value) {
+    return binary_search(array.data(), array.size(), value);
+}
+
+inline Real cumsum(std::vector<Real> & v) {
+    auto n = v.size();
+    Real q = 0;
+    for(size_t i = 0; i < n ; i++ ) {
+        q = (v[i] += q);
+    };
+    return q;
+}
+
+inline Real cumsum(RealVector& v) {
+    auto n = v.rows();
+    Real q = 0;
+    for(int i = 0; i < n; i++ ) {
+        q = (v(i) += q);
+    };
+    return q;
+}
+
+template<class ArrayType>
+inline size_t draw_from_p(ArrayType& array, UrandDevice & rand) {
+    Real max = cumsum(array);
+    return binary_search(array, max * rand.rand());
+}
+
+
+LDATrainerBase::LDATrainerBase (
         Eigen::Ref<IntegerVector> counts,
         Eigen::Ref<IndexVector> dixs,
         Eigen::Ref<IndexVector> wixs,
@@ -40,24 +74,25 @@ DocState::DocState (
         size_t wix = wixs(i);
 
         for (size_t j = 0; j < c; j++ ) {
-            std::size_t assign = std::floor(n_topics_ * urand_.rand()); 
-            word_states.emplace_back(dix, wix, assign);
+            word_states.emplace_back(dix, wix, 0);
         }
     }
 }
 
-void DocState::initialize_count(
+void LDATrainerBase::initialize_count(
         Eigen::Ref<IntegerMatrix> doc_topic, 
         Eigen::Ref<IntegerMatrix> word_topic
 ) {
+    RealVector temp_p(n_topics_);
     for (auto & ws: word_states) {
+        temp_p = doc_topic_prior(ws.doc_id);
+        ws.topic_id = draw_from_p(temp_p, urand_);
         doc_topic(ws.doc_id, ws.topic_id)++;
         word_topic(ws.word_id, ws.topic_id)++;
     }
 }
 
-void DocState::iterate_gibbs(
-        Eigen::Ref<RealVector> doc_topic_prior,
+void LDATrainerBase::iterate_gibbs(
         Eigen::Ref<RealVector> topic_word_prior, 
         Eigen::Ref<IntegerMatrix> doc_topic, 
         Eigen::Ref<IntegerMatrix> word_topic,
@@ -65,26 +100,21 @@ void DocState::iterate_gibbs(
         ) {
 
     Real eta_sum = topic_word_prior.sum();
-    std::vector<Real> p_(n_topics_);
+    RealVector p_(n_topics_);
 
     for (auto & ws : word_states ) {
         doc_topic(ws.doc_id, ws.topic_id)--;
         word_topic(ws.word_id, ws.topic_id)--;
         topic_counts(ws.topic_id)--;
 
-        Eigen::Map<Eigen::Array<Real,  Eigen::Dynamic, 1>> (p_.data(), n_topics_) = (
+        p_ = (
             word_topic.row(ws.word_id).cast<Real>().transpose().array() + topic_word_prior.array()
         ).array() / ( topic_counts.cast<Real>().array() + eta_sum)  * (
-            doc_topic.row(ws.doc_id).cast<Real>().transpose().array() + doc_topic_prior.array()
+            doc_topic.row(ws.doc_id).cast<Real>().transpose().array() +
+            doc_topic_prior(ws.doc_id).array()
         );
 
-        double q = 0;
-        for(size_t i = 0; i < n_topics_; i++ ) {
-            p_[i] += q;
-            q = p_[i];
-        }
-        q *= urand_.rand();
-        ws.topic_id = binary_search(p_, q);
+        ws.topic_id = draw_from_p(p_, urand_);
 
         doc_topic(ws.doc_id, ws.topic_id)++;
         word_topic(ws.word_id, ws.topic_id)++; 
@@ -92,7 +122,7 @@ void DocState::iterate_gibbs(
     }
 }
 
-Real DocState::log_likelihood(
+Real LDATrainerBase::log_likelihood(
         Eigen::Ref<RealVector> topic_word_prior, 
         Eigen::Ref<IntegerMatrix> word_topic) { 
     size_t n_words = word_topic.rows();
@@ -108,6 +138,42 @@ Real DocState::log_likelihood(
     }
 
     return ll;
+}
+
+LDATrainer::LDATrainer(
+        const RealVector & doc_topic_prior,
+        Eigen::Ref<IntegerVector> counts,
+        Eigen::Ref<IndexVector> dixs,
+        Eigen::Ref<IndexVector> wixs,
+        size_t n_topics,
+        int random_seed
+) : LDATrainerBase(counts, dixs, wixs, n_topics, random_seed),
+    doc_topic_prior_(doc_topic_prior) {
+}
+
+const RealVector & LDATrainer::doc_topic_prior(
+    std::size_t doc_index
+){ 
+    return doc_topic_prior_;
+}
+
+
+LabelledLDATrainer::LabelledLDATrainer(
+        Real alpha,
+        Real epsilon,
+        const IntegerMatrix & labels,
+        Eigen::Ref<IntegerVector> counts,
+        Eigen::Ref<IndexVector> dixs,
+        Eigen::Ref<IndexVector> wixs,
+        size_t n_topics,
+        int random_seed
+): LDATrainerBase(counts, dixs, wixs, n_topics, random_seed), alpha_(alpha),
+    epsilon_(epsilon), labels_(labels){
+
+}
+
+const RealVector & LabelledLDATrainer::doc_topic_prior(size_t doc_index) {
+    return (labels_.row(doc_index).cast<Real>().array() * alpha_ + epsilon_).transpose();
 }
 
 Predictor::Predictor(
@@ -127,8 +193,8 @@ void Predictor::predict(
         std::vector<IntegerVector> counts,
         std::size_t max_iter
 ) { 
-    std::vector<Real> p_(n_topics_);
-    Eigen::Map<Eigen::Array<Real, Eigen::Dynamic, 1>> p_mapped(p_.data(), n_topics_);
+    //std::vector<Real> p_(n_topics_);
+    RealVector p_(n_topics_);
     std::vector<size_t> topics;
     for (size_t n = 0; n < n_domains_; n++) {
         IntegerVector & nonzero = nonzeros[n]; 
@@ -154,19 +220,14 @@ void Predictor::predict(
 
                     result(current_topic)--;
 
-                    p_mapped = (
+                    p_ = (
                         betas_[n].row(wid).transpose().array() 
                         * result.cast<Real>().array()
                     );
 
-
-                    double q = 0;
-                    for(size_t i = 0; i < n_topics_; i++ ) {
-                        p_[i] += q;
-                        q = p_[i];
-                    }
-                    q *= urand_.rand();
-                    current_topic = binary_search(p_, q);
+                    current_topic = draw_from_p(
+                        p_, urand_
+                    );
 
                     result(current_topic)++;
                     topics[current_iter] = current_topic;

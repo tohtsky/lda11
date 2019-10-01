@@ -100,24 +100,41 @@ struct LabelledLDATrainer :LDATrainerBase {
 struct Predictor {
     Predictor(
         size_t n_topics,
+        const RealVector & doc_topic_prior,
         int random_seed = 42
     );
 
-    void add_beta(RealMatrix beta);
+    void add_beta(const RealMatrix & beta);
 
-    void predict(
-        Eigen::Ref<IntegerVector> result,
+    IntegerVector predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,
-        std::size_t iter
+        std::size_t iter,
+        int random_seed=42
     );
+
+    const RealVector & doc_topic_prior() const {
+        return doc_topic_prior_;
+    }
+
+    inline std::vector<RealMatrix>::const_iterator beta_begin () const {
+        return betas_.cbegin();
+    }
+
+    inline std::vector<RealMatrix>::const_iterator beta_end () const {
+        return betas_.cend();
+    } 
+
+    size_t n_topics() const{
+        return n_topics_;
+    }
 
     private:
 
     const std::size_t n_topics_; 
+    RealVector doc_topic_prior_;
     std::size_t n_domains_;
     std::vector<RealMatrix> betas_;
-    UrandDevice urand_; 
 };
 
 Real log_likelihood_doc_topic(

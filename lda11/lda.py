@@ -316,7 +316,7 @@ class MultipleContextLDA(object):
         ]
         self.word_topics = word_topics
 
-        predictor = Predictor(self.n_components, 42)
+        predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
 
         for i, wt in enumerate(word_topics):
             wt = wt + self.topic_word_priors[i][:, np.newaxis]
@@ -327,13 +327,13 @@ class MultipleContextLDA(object):
 
         return doc_topic
 
-    def transform(self, *Xs, n_iter=100):
+    def transform(self, *Xs, n_iter=100, random_seed=42):
         n_domains = len(Xs)
         shapes =  set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
         for shape in shapes: break
 
-        results = np.zeros((shape, self.n_components), dtype=IntegerType)
+        results = np.zeros((shape, self.n_components), dtype=RealType)
         for i in tqdm(range(shape)):
             counts = []
             wixs = []
@@ -342,11 +342,10 @@ class MultipleContextLDA(object):
                 counts.append(count)
                 wixs.append(wix)
 
-            m = np.zeros(self.n_components, dtype=IntegerType) 
-            self.predictor.predict(
-                m, wixs, counts, n_iter
+            m = self.predictor.predict_gibbs(
+                wixs, counts, n_iter, random_seed
             )
-            assert(m.sum() >= 0)
-            results[i] = m
+            m = m + self.doc_topic_prior
+            results[i] = m / m.sum()
         return results
 

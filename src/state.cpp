@@ -178,22 +178,26 @@ const RealVector & LabelledLDATrainer::doc_topic_prior(size_t doc_index) {
 
 Predictor::Predictor(
         size_t n_topics,
+        const RealVector & doc_topic_prior,
         int random_seed
-): n_topics_(n_topics), n_domains_(0), betas_(), urand_(random_seed) {
+): n_topics_(n_topics), doc_topic_prior_(doc_topic_prior), n_domains_(0), betas_() {
 }
 
-void Predictor::add_beta(RealMatrix beta) {
+void Predictor::add_beta(const RealMatrix & beta) {
     betas_.push_back(beta);
     n_domains_++;
 }
 
-void Predictor::predict(
-        Eigen::Ref<IntegerVector> result,
+IntegerVector Predictor::predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,
-        std::size_t max_iter
-) { 
+        std::size_t max_iter,
+        int random_seed
+){ 
     //std::vector<Real> p_(n_topics_);
+    IntegerVector result(n_topics_);
+    result.array() = 0;
+    UrandDevice urand_(random_seed);
     RealVector p_(n_topics_);
     std::vector<size_t> topics;
     for (size_t n = 0; n < n_domains_; n++) {
@@ -202,7 +206,8 @@ void Predictor::predict(
         size_t n_unique_word = nonzeros[n].rows();
         for ( size_t j = 0; j < n_unique_word; j++ ) {
             for (int k = 0; k < count(j); k++ ) {
-                size_t init_topic = std::floor(n_topics_ * urand_.rand()); 
+                p_ = doc_topic_prior();
+                size_t init_topic = draw_from_p(p_, urand_); 
                 topics.push_back( init_topic );
                 result(init_topic)++;
             }
@@ -222,7 +227,7 @@ void Predictor::predict(
 
                     p_ = (
                         betas_[n].row(wid).transpose().array() 
-                        * result.cast<Real>().array()
+                        * ( result.cast<Real>().array() + doc_topic_prior_.array() )
                     );
 
                     current_topic = draw_from_p(
@@ -237,7 +242,7 @@ void Predictor::predict(
             }
         }
     }
-    //return result;
+    return result;
 }
 
 Real log_likelihood_doc_topic (

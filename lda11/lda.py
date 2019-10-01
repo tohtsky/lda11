@@ -335,7 +335,7 @@ class MultipleContextLDA(object):
         for shape in shapes: break
 
         results = np.zeros((shape, self.n_components), dtype=RealType)
-        for i in tqdm(range(shape)):
+        for i in range(shape):
             counts = []
             wixs = []
             for n in range(n_domains):

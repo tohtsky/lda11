@@ -219,9 +219,9 @@ class MultipleContextLDA(object):
 
         self.predictor = None
 
-    def fit(self, X, n_iter=1000):
+    def fit(self, *X, n_iter=1000):
 
-        return self._fit(X, n_iter=n_iter)
+        return self._fit(*X, n_iter=n_iter)
 
     def fit_transform(self, *X, **kwargs):
         result = self._fit(*X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
@@ -230,7 +230,8 @@ class MultipleContextLDA(object):
 
     def _fit(self, *Xs, n_iter=1000, ll_freq=10):
         """
-        Xs should be a list.
+        Xs should be a list of contents.
+        All entries must have the same shape[0].
         """
         n_vocabs = []
 

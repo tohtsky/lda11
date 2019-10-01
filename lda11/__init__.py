@@ -1,1 +1,1 @@
-from .lda import LDA, MultipleContextLDA
+from .lda import LDA, MultipleContextLDA, LabelledLDA

@@ -48,7 +48,6 @@ def bow_row_to_counts(X, i):
     return counts.astype(IntegerType), wix.astype(IndexType)
 
 
-
 class LDA(object):
     def __init__(self, n_components=10, doc_topic_prior=None, topic_word_prior=None):
         n_components = int(n_components)
@@ -60,9 +59,9 @@ class LDA(object):
         self.docstate_ = None
         self.components_ = None
 
-    def fit(self, X, n_iter=1000):
-
-        return self._fit(X, n_iter=n_iter)
+    def fit(self, X, n_iter=1000): 
+        self._fit(X, n_iter=n_iter)
+        return self
 
     def fit_transform(self, X, **kwargs):
         result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
@@ -133,7 +132,8 @@ class LabelledLDA(object):
         self.components_ = None
 
     def fit(self, X, Y, n_iter=1000): 
-        return self._fit(X, Y, n_iter=n_iter)
+        self._fit(X, Y, n_iter=n_iter)
+        return self
 
     def fit_transform(self, X, Y, **kwargs):
         result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
@@ -173,15 +173,7 @@ class LabelledLDA(object):
         topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
         self.components_ = word_topic.transpose()
 
-        #ll = docstate.log_likelihood(
-        #    self.topic_word_prior,
-        #    word_topic,
-        #) + log_likelihood_doc_topic( 
-        #    self.doc_topic_prior, doc_topic
-        #)
-
         with tqdm(range(n_iter)) as pbar:
-            #pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
             for i in pbar:
                 docstate.iterate_gibbs(
                     self.topic_word_prior,
@@ -189,16 +181,6 @@ class LabelledLDA(object):
                     word_topic,
                     topic_counts
                 )
-                #if ( i + 1) % ll_freq == 0:
-                #    ll = docstate.log_likelihood(
-                #        self.topic_word_prior,
-                #        word_topic,
-                #    ) + log_likelihood_doc_topic( 
-                #        self.doc_topic_prior, doc_topic
-                #    ) 
-
-                #    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
-
         return doc_topic
 
 
@@ -219,9 +201,9 @@ class MultipleContextLDA(object):
 
         self.predictor = None
 
-    def fit(self, *X, n_iter=1000):
-
-        return self._fit(*X, n_iter=n_iter)
+    def fit(self, *X, n_iter=1000): 
+        self._fit(*X, n_iter=n_iter)
+        return self
 
     def fit_transform(self, *X, **kwargs):
         result = self._fit(*X, **kwargs) + self.doc_topic_prior[np.newaxis, :]

@@ -39,7 +39,7 @@ def bow_row_to_counts(X, i):
     if isinstance(X, np.ndarray):
         assert(len(X.shape) == 2)
         assert(X.dtype == np.int32 or X.dtype == np.int64) 
-        wix = X[i].nonzero()
+        wix, = X[i].nonzero()
         counts = X[i, wix] 
     else:
         _, wix = X[i].nonzero()
@@ -310,7 +310,7 @@ class MultipleContextLDA(object):
 
         return doc_topic
 
-    def transform(self, *Xs, n_iter=100, random_seed=42):
+    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10):
         n_domains = len(Xs)
         shapes =  set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
@@ -324,11 +324,16 @@ class MultipleContextLDA(object):
                 count, wix = bow_row_to_counts(Xs[n], i)
                 counts.append(count)
                 wixs.append(wix)
-
-            m = self.predictor.predict_gibbs(
-                wixs, counts, n_iter, random_seed
-            )
-            m = m + self.doc_topic_prior
-            results[i] = m / m.sum()
+            if mode == "gibbs": 
+                m = self.predictor.predict_gibbs(
+                    wixs, counts, n_iter, random_seed
+                )
+                m = m + self.doc_topic_prior
+                results[i] = m / m.sum()
+            else:
+                results[i] = self.predictor.predict_mf(
+                    wixs, counts, n_iter, mf_tolerance
+                )
         return results
+
 

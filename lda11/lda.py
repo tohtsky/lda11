@@ -39,14 +39,13 @@ def bow_row_to_counts(X, i):
     if isinstance(X, np.ndarray):
         assert(len(X.shape) == 2)
         assert(X.dtype == np.int32 or X.dtype == np.int64) 
-        wix = X[i].nonzero()
+        wix, = X[i].nonzero()
         counts = X[i, wix] 
     else:
         _, wix = X[i].nonzero()
         counts = X[i, wix].toarray().ravel()
 
     return counts.astype(IntegerType), wix.astype(IndexType)
-
 
 
 class LDA(object):
@@ -60,9 +59,9 @@ class LDA(object):
         self.docstate_ = None
         self.components_ = None
 
-    def fit(self, X, n_iter=1000):
-
-        return self._fit(X, n_iter=n_iter)
+    def fit(self, X, n_iter=1000): 
+        self._fit(X, n_iter=n_iter)
+        return self
 
     def fit_transform(self, X, **kwargs):
         result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
@@ -133,7 +132,8 @@ class LabelledLDA(object):
         self.components_ = None
 
     def fit(self, X, Y, n_iter=1000): 
-        return self._fit(X, Y, n_iter=n_iter)
+        self._fit(X, Y, n_iter=n_iter)
+        return self
 
     def fit_transform(self, X, Y, **kwargs):
         result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
@@ -173,15 +173,7 @@ class LabelledLDA(object):
         topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
         self.components_ = word_topic.transpose()
 
-        #ll = docstate.log_likelihood(
-        #    self.topic_word_prior,
-        #    word_topic,
-        #) + log_likelihood_doc_topic( 
-        #    self.doc_topic_prior, doc_topic
-        #)
-
         with tqdm(range(n_iter)) as pbar:
-            #pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
             for i in pbar:
                 docstate.iterate_gibbs(
                     self.topic_word_prior,
@@ -189,16 +181,6 @@ class LabelledLDA(object):
                     word_topic,
                     topic_counts
                 )
-                #if ( i + 1) % ll_freq == 0:
-                #    ll = docstate.log_likelihood(
-                #        self.topic_word_prior,
-                #        word_topic,
-                #    ) + log_likelihood_doc_topic( 
-                #        self.doc_topic_prior, doc_topic
-                #    ) 
-
-                #    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
-
         return doc_topic
 
 
@@ -219,9 +201,9 @@ class MultipleContextLDA(object):
 
         self.predictor = None
 
-    def fit(self, X, n_iter=1000):
-
-        return self._fit(X, n_iter=n_iter)
+    def fit(self, *X, n_iter=1000): 
+        self._fit(*X, n_iter=n_iter)
+        return self
 
     def fit_transform(self, *X, **kwargs):
         result = self._fit(*X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
@@ -230,7 +212,8 @@ class MultipleContextLDA(object):
 
     def _fit(self, *Xs, n_iter=1000, ll_freq=10):
         """
-        Xs should be a list.
+        Xs should be a list of contents.
+        All entries must have the same shape[0].
         """
         n_vocabs = []
 
@@ -327,25 +310,30 @@ class MultipleContextLDA(object):
 
         return doc_topic
 
-    def transform(self, *Xs, n_iter=100, random_seed=42):
+    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs"):
         n_domains = len(Xs)
         shapes =  set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
         for shape in shapes: break
 
         results = np.zeros((shape, self.n_components), dtype=RealType)
-        for i in tqdm(range(shape)):
+        for i in range(shape):
             counts = []
             wixs = []
             for n in range(n_domains):
                 count, wix = bow_row_to_counts(Xs[n], i)
                 counts.append(count)
                 wixs.append(wix)
-
-            m = self.predictor.predict_gibbs(
-                wixs, counts, n_iter, random_seed
-            )
-            m = m + self.doc_topic_prior
-            results[i] = m / m.sum()
+            if mode == "gibbs": 
+                m = self.predictor.predict_gibbs(
+                    wixs, counts, n_iter, random_seed
+                )
+                m = m + self.doc_topic_prior
+                results[i] = m / m.sum()
+            else:
+                results[i] = self.predictor.predict_mf(
+                    wixs, counts, n_iter, 1e-10
+                )
         return results
+
 

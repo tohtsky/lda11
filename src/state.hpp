@@ -106,6 +106,14 @@ struct Predictor {
 
     void add_beta(const RealMatrix & beta);
 
+    RealVector predict_mf(
+        std::vector<IntegerVector> nonzeros,
+        std::vector<IntegerVector> counts,
+        std::size_t iter,
+        Real delta
+    );
+
+
     IntegerVector predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,

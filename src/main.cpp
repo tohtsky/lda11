@@ -11,7 +11,7 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(_lda, m) {
-    m.doc() = "pybind11 example plugin"; // optional module docstring
+    m.doc() = "Backend C++ inplementation for lda11.";
     py::class_<LDATrainer>(m, "LDATrainer")
         .def(py::init< 
                 const RealVector &, 
@@ -51,6 +51,7 @@ PYBIND11_MODULE(_lda, m) {
         )
         .def("add_beta", &Predictor::add_beta)
         .def("predict_gibbs", &Predictor::predict_gibbs) 
+        .def("predict_mf", &Predictor::predict_mf) 
         .def("__getstate__", [](const Predictor &p) {
             std::vector<RealMatrix> betas;
             for (auto b = p.beta_begin(); b!=p.beta_end(); b++) {

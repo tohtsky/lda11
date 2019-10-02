@@ -310,7 +310,7 @@ class MultipleContextLDA(object):
 
         return doc_topic
 
-    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs"):
+    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10):
         n_domains = len(Xs)
         shapes =  set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
@@ -332,7 +332,7 @@ class MultipleContextLDA(object):
                 results[i] = m / m.sum()
             else:
                 results[i] = self.predictor.predict_mf(
-                    wixs, counts, n_iter, 1e-10
+                    wixs, counts, n_iter, mf_tolerance
                 )
         return results
 

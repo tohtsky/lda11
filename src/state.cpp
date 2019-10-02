@@ -198,6 +198,9 @@ RealVector Predictor::predict_mf(
   for (size_t n = 0; n < n_domains_; n++ ) {
     dim_buffer += counts[n].sum();
   }
+  if (dim_buffer == 0 ) {
+      return doc_topic_prior_ / doc_topic_prior_.sum();
+  }
   RealMatrix current_prob (dim_buffer, n_topics_);
   current_prob.array() = 0;
   RealMatrix new_prob(dim_buffer, n_topics_);

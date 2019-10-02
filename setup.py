@@ -4,8 +4,7 @@ import sys
 import setuptools
 from distutils.command.clean import clean as Clean
 import os
-__version__ = '0.0.1'
-
+__version__ = '0.1.2'
 install_requires = ['pybind11>=2.4', 'numpy >= 1.11', 'tqdm']
 
 eigen_include_dir = os.environ.get('EIGEN3_INCLUDE_DIR', None)
@@ -132,8 +131,9 @@ setup(
     name='lda11',
     version=__version__,
     author='Tomoki Ohtsuki',
+    url='https://github.com/tohtsky/lda11',
     author_email='tomoki.ohtsuki129@gmail.com',
-    description='A test project using pybind11',
+    description='Yet another CGS sampler for Latent Dirichlet Allocation.',
     long_description='',
     ext_modules=ext_modules,
     install_requires=install_requires,

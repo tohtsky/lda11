@@ -8,6 +8,7 @@ RealType = np.float64
 IntegerType = np.int32
 IndexType = np.uint64
 
+
 def number_to_array(n_components, default, arg=None):
     if arg is None:
         arg = default
@@ -29,18 +30,20 @@ def check_array(X):
         dix, wix = X.nonzero()
         counts = X[dix, wix]
     else:
-        X = X.tocsr() # if X is either types of, scipy.sparse X has this attribute.
+        # if X is either types of, scipy.sparse X has this attribute.
+        X = X.tocsr()
         X.sort_indices()
         dix, wix = X.nonzero()
         counts = X.data
     return counts.astype(IntegerType), dix.astype(IndexType), wix.astype(IndexType)
 
+
 def bow_row_to_counts(X, i):
     if isinstance(X, np.ndarray):
         assert(len(X.shape) == 2)
-        assert(X.dtype == np.int32 or X.dtype == np.int64) 
+        assert(X.dtype == np.int32 or X.dtype == np.int64)
         wix, = X[i].nonzero()
-        counts = X[i, wix] 
+        counts = X[i, wix]
     else:
         _, wix = X[i].nonzero()
         counts = X[i, wix].toarray().ravel()
@@ -53,24 +56,24 @@ class LDA(object):
         n_components = int(n_components)
         self.n_components = n_components
 
-        self.doc_topic_prior = doc_topic_prior 
+        self.doc_topic_prior = doc_topic_prior
         self.topic_word_prior = topic_word_prior
         self.n_vocabs = None
         self.docstate_ = None
         self.components_ = None
 
-    def fit(self, X, n_iter=1000): 
-        self._fit(X, n_iter=n_iter)
+    def fit(self, X, n_iter=500, ll_freq=10):
+        self._fit(X, n_iter=n_iter, ll_freq=ll_freq)
         return self
 
     def fit_transform(self, X, **kwargs):
         result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
         result /= result.sum(axis=1)[:, np.newaxis]
-        return result 
+        return result
 
     def _fit(self, X, n_iter=1000, ll_freq=10):
         self.doc_topic_prior = number_to_array(
-            self.n_components, 1 / float(self.n_components), 
+            self.n_components, 1 / float(self.n_components),
             self.doc_topic_prior
         )
         self.topic_word_prior = number_to_array(
@@ -84,11 +87,14 @@ class LDA(object):
             print('Check for X failed.')
             raise
 
-        doc_topic = np.zeros( (X.shape[0], self.n_components), dtype=IntegerType)
-        word_topic = np.zeros( (X.shape[1], self.n_components), dtype=IntegerType) 
+        doc_topic = np.zeros(
+            (X.shape[0], self.n_components), dtype=IntegerType)
+        word_topic = np.zeros(
+            (X.shape[1], self.n_components), dtype=IntegerType)
 
-        docstate = LDATrainer(self.topic_word_prior, count, dix, wix, self.n_components, 42)
-        docstate.initialize( doc_topic, word_topic )
+        docstate = LDATrainer(self.doc_topic_prior, count,
+                              dix, wix, self.n_components, 42)
+        docstate.initialize(doc_topic, word_topic)
 
         topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
         self.components_ = word_topic.transpose()
@@ -96,7 +102,7 @@ class LDA(object):
         ll = docstate.log_likelihood(
             self.topic_word_prior,
             word_topic,
-        ) + log_likelihood_doc_topic( 
+        ) + log_likelihood_doc_topic(
             self.doc_topic_prior, doc_topic
         )
 
@@ -109,40 +115,44 @@ class LDA(object):
                     word_topic,
                     topic_counts
                 )
-                if ( i + 1) % ll_freq == 0:
+                if (i + 1) % ll_freq == 0:
                     ll = docstate.log_likelihood(
                         self.topic_word_prior,
                         word_topic,
-                    ) + log_likelihood_doc_topic( 
+                    ) + log_likelihood_doc_topic(
                         self.doc_topic_prior, doc_topic
-                    ) 
+                    )
 
-                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
+                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
 
+        phi = self.components_ + self.topic_word_prior[np.newaxis, :]
+        phi /= phi.sum(axis=1)[:, np.newaxis]
+        self.phi = phi
         return doc_topic
+
 
 class LabelledLDA(object):
     def __init__(self, alpha=1e-2, epsilon=1e-30, topic_word_prior=None):
         self.n_components = None
         self.topic_word_prior = topic_word_prior
-        self.alpha = alpha 
+        self.alpha = alpha
         self.epsilon = 1e-20
         self.n_vocabs = None
         self.docstate_ = None
         self.components_ = None
 
-    def fit(self, X, Y, n_iter=1000): 
+    def fit(self, X, Y, n_iter=1000):
         self._fit(X, Y, n_iter=n_iter)
         return self
 
     def fit_transform(self, X, Y, **kwargs):
         result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
         result /= result.sum(axis=1)[:, np.newaxis]
-        return result 
+        return result
 
     def _fit(self, X, Y, n_iter=1000, ll_freq=10):
         if isinstance(Y, np.ndarray):
-            Y = Y.astype(IntegerType) 
+            Y = Y.astype(IntegerType)
         else:
             Y = Y.toarray().astype(IntegerType)
 
@@ -159,8 +169,10 @@ class LabelledLDA(object):
             print('Check for X failed.')
             raise
 
-        doc_topic = np.zeros( (X.shape[0], self.n_components), dtype=IntegerType)
-        word_topic = np.zeros( (X.shape[1], self.n_components), dtype=IntegerType) 
+        doc_topic = np.zeros(
+            (X.shape[0], self.n_components), dtype=IntegerType)
+        word_topic = np.zeros(
+            (X.shape[1], self.n_components), dtype=IntegerType)
 
         docstate = LabelledLDATrainer(
             self.alpha,
@@ -168,7 +180,7 @@ class LabelledLDA(object):
             Y,
             count, dix, wix, self.n_components, 42
         )
-        docstate.initialize( doc_topic, word_topic )
+        docstate.initialize(doc_topic, word_topic)
 
         topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
         self.components_ = word_topic.transpose()
@@ -186,13 +198,13 @@ class LabelledLDA(object):
 
 class MultipleContextLDA(object):
     def __init__(
-        self, n_components=100, 
+        self, n_components=100,
         doc_topic_prior=None, topic_word_priors=None
     ):
         n_components = int(n_components)
         self.n_components = n_components
 
-        self.doc_topic_prior = doc_topic_prior 
+        self.doc_topic_prior = doc_topic_prior
         self.topic_word_priors = topic_word_priors
         self.n_vocabs = None
         self.docstate_ = None
@@ -201,14 +213,14 @@ class MultipleContextLDA(object):
 
         self.predictor = None
 
-    def fit(self, *X, n_iter=1000): 
+    def fit(self, *X, n_iter=1000):
         self._fit(*X, n_iter=n_iter)
         return self
 
     def fit_transform(self, *X, **kwargs):
         result = self._fit(*X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
         result /= result.sum(axis=1)[:, np.newaxis]
-        return result 
+        return result
 
     def _fit(self, *Xs, n_iter=1000, ll_freq=10):
         """
@@ -219,16 +231,16 @@ class MultipleContextLDA(object):
 
         self.modality = len(Xs)
         self.doc_topic_prior = number_to_array(
-            self.n_components, 1 / float(self.n_components), 
+            self.n_components, 1 / float(self.n_components),
             self.doc_topic_prior
         )
 
         if self.topic_word_priors is None:
-            self.topic_word_priors = [ None for i in range(self.modality) ]
+            self.topic_word_priors = [None for i in range(self.modality)]
 
         self.topic_word_priors = [
             number_to_array(
-                X.shape[1], 1 / float(self.n_components), 
+                X.shape[1], 1 / float(self.n_components),
             )
             for X, val in zip(Xs, self.topic_word_priors)
         ]
@@ -243,9 +255,10 @@ class MultipleContextLDA(object):
                 print('Check for X failed.')
                 raise
 
-        doc_topic = np.zeros( (X.shape[0], self.n_components), dtype=IntegerType)
+        doc_topic = np.zeros(
+            (X.shape[0], self.n_components), dtype=IntegerType)
         word_topics = [
-            np.zeros( (X.shape[1], self.n_components), dtype=IntegerType) 
+            np.zeros((X.shape[1], self.n_components), dtype=IntegerType)
             for X in Xs
         ]
 
@@ -259,39 +272,39 @@ class MultipleContextLDA(object):
             docstate.initialize(doc_topic, word_topic)
 
         topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
-        ll = log_likelihood_doc_topic( 
+        ll = log_likelihood_doc_topic(
             self.doc_topic_prior, doc_topic
         )
         for topic_word_prior, word_topic, docstate in zip(
-                    self.topic_word_priors, word_topics, docstates
-        ): 
+            self.topic_word_priors, word_topics, docstates
+        ):
             ll += docstate.log_likelihood(
                 topic_word_prior, word_topic
             )
 
-        with tqdm(range(n_iter)) as pbar: 
+        with tqdm(range(n_iter)) as pbar:
             pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
             for i in pbar:
                 for topic_word_prior, word_topic, docstate in zip(
                     self.topic_word_priors, word_topics, docstates
-                ): 
+                ):
                     docstate.iterate_gibbs(
                         topic_word_prior,
                         doc_topic,
                         word_topic,
                         topic_counts
                     )
-                if ( i + 1) % ll_freq == 0:
-                    ll = log_likelihood_doc_topic( 
+                if (i + 1) % ll_freq == 0:
+                    ll = log_likelihood_doc_topic(
                         self.doc_topic_prior, doc_topic
                     )
                     for topic_word_prior, word_topic, docstate in zip(
-                                self.topic_word_priors, word_topics, docstates
-                    ): 
+                        self.topic_word_priors, word_topics, docstates
+                    ):
                         ll += docstate.log_likelihood(
                             topic_word_prior, word_topic
                         )
-                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
+                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
 
         self.components_ = [
             word_topic.transpose()
@@ -312,9 +325,10 @@ class MultipleContextLDA(object):
 
     def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10):
         n_domains = len(Xs)
-        shapes =  set({X.shape[0] for X in Xs})
+        shapes = set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
-        for shape in shapes: break
+        for shape in shapes:
+            break
 
         results = np.zeros((shape, self.n_components), dtype=RealType)
         for i in range(shape):
@@ -324,7 +338,7 @@ class MultipleContextLDA(object):
                 count, wix = bow_row_to_counts(Xs[n], i)
                 counts.append(count)
                 wixs.append(wix)
-            if mode == "gibbs": 
+            if mode == "gibbs":
                 m = self.predictor.predict_gibbs(
                     wixs, counts, n_iter, random_seed
                 )
@@ -335,5 +349,3 @@ class MultipleContextLDA(object):
                     wixs, counts, n_iter, mf_tolerance
                 )
         return results
-
-

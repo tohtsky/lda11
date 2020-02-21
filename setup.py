@@ -4,7 +4,7 @@ import sys
 import setuptools
 from distutils.command.clean import clean as Clean
 import os
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 install_requires = ['pybind11>=2.4', 'numpy >= 1.11', 'tqdm']
 
 eigen_include_dir = os.environ.get('EIGEN3_INCLUDE_DIR', None)

@@ -23,6 +23,7 @@ PYBIND11_MODULE(_lda, m) {
               >())
         .def("initialize", &LDATrainer::initialize_count)
         .def("iterate_gibbs", &LDATrainer::iterate_gibbs) 
+        .def("obtain_phi", &LDATrainer::obtain_phi) 
         .def("log_likelihood", &LDATrainer::log_likelihood) 
     ;
 
@@ -52,6 +53,7 @@ PYBIND11_MODULE(_lda, m) {
         .def("add_beta", &Predictor::add_beta)
         .def("predict_gibbs", &Predictor::predict_gibbs) 
         .def("predict_mf", &Predictor::predict_mf) 
+        .def_readonly("phis", &Predictor::betas_)
         .def("__getstate__", [](const Predictor &p) {
             std::vector<RealMatrix> betas;
             for (auto b = p.beta_begin(); b!=p.beta_end(); b++) {

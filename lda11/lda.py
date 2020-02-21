@@ -125,75 +125,38 @@ class LDA(object):
 
                     pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
 
-        phi = self.components_ + self.topic_word_prior[np.newaxis, :]
-        phi /= phi.sum(axis=1)[:, np.newaxis]
-        self.phi = phi
+        phi = docstate.obtain_phi(
+            self.topic_word_prior,
+            doc_topic,
+            word_topic,
+            topic_counts
+        )
+ 
+        self.predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
+
+        self.predictor.add_beta(phi.transpose())
         return doc_topic
 
+    @property
+    def phi(self):
+        return self.predictor.phis[0]
 
-class LabelledLDA(object):
-    def __init__(self, alpha=1e-2, epsilon=1e-30, topic_word_prior=None):
-        self.n_components = None
-        self.topic_word_prior = topic_word_prior
-        self.alpha = alpha
-        self.epsilon = 1e-20
-        self.n_vocabs = None
-        self.docstate_ = None
-        self.components_ = None
-
-    def fit(self, X, Y, n_iter=1000):
-        self._fit(X, Y, n_iter=n_iter)
-        return self
-
-    def fit_transform(self, X, Y, **kwargs):
-        result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
-        result /= result.sum(axis=1)[:, np.newaxis]
-        return result
-
-    def _fit(self, X, Y, n_iter=1000, ll_freq=10):
-        if isinstance(Y, np.ndarray):
-            Y = Y.astype(IntegerType)
-        else:
-            Y = Y.toarray().astype(IntegerType)
-
-        self.n_components = Y.shape[1]
-
-        self.topic_word_prior = number_to_array(
-            X.shape[1], 1 / float(self.n_components),
-            self.topic_word_prior
-        )
-
-        try:
-            count, dix, wix = check_array(X)
-        except:
-            print('Check for X failed.')
-            raise
-
-        doc_topic = np.zeros(
-            (X.shape[0], self.n_components), dtype=IntegerType)
-        word_topic = np.zeros(
-            (X.shape[1], self.n_components), dtype=IntegerType)
-
-        docstate = LabelledLDATrainer(
-            self.alpha,
-            self.epsilon,
-            Y,
-            count, dix, wix, self.n_components, 42
-        )
-        docstate.initialize(doc_topic, word_topic)
-
-        topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
-        self.components_ = word_topic.transpose()
-
-        with tqdm(range(n_iter)) as pbar:
-            for i in pbar:
-                docstate.iterate_gibbs(
-                    self.topic_word_prior,
-                    doc_topic,
-                    word_topic,
-                    topic_counts
+    def transform(self, X, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10, gibbs_burn_in=10):
+        shape = X.shape[0]
+        results = np.zeros((shape, self.n_components), dtype=RealType)
+        for i in range(shape):
+            count, wix = bow_row_to_counts(X, i)
+            if mode == "gibbs":
+                m = self.predictor.predict_gibbs(
+                    [wix], [count], n_iter, gibbs_burn_in, random_seed
                 )
-        return doc_topic
+                results[i] = m
+            else:
+                results[i] = self.predictor.predict_mf(
+                    [wix], [count], n_iter, mf_tolerance
+                )
+        return results
+
 
 
 class MultipleContextLDA(object):
@@ -221,6 +184,7 @@ class MultipleContextLDA(object):
         result = self._fit(*X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
         result /= result.sum(axis=1)[:, np.newaxis]
         return result
+    
 
     def _fit(self, *Xs, n_iter=1000, ll_freq=10):
         """
@@ -306,24 +270,26 @@ class MultipleContextLDA(object):
                         )
                     pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
 
-        self.components_ = [
-            word_topic.transpose()
-            for word_topic in word_topics
-        ]
-        self.word_topics = word_topics
-
         predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
 
-        for i, wt in enumerate(word_topics):
-            wt = wt + self.topic_word_priors[i][:, np.newaxis]
-            wt /= wt.sum(axis=0)[np.newaxis, :]
-            wt = wt.astype(RealType)
-            predictor.add_beta(wt)
+        for i, (twp, wt, docstate) in enumerate(zip(self.topic_word_priors, word_topics, docstates)):
+            phi = docstate.obtain_phi(
+                twp,
+                doc_topic,
+                wt,
+                topic_counts
+            )
+            predictor.add_beta(phi.transpose())
+
         self.predictor = predictor
 
         return doc_topic
+    
+    @property
+    def phis(self):
+        return self.predictor.phis
 
-    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10):
+    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10, gibbs_burn_in=10):
         n_domains = len(Xs)
         shapes = set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
@@ -340,12 +306,88 @@ class MultipleContextLDA(object):
                 wixs.append(wix)
             if mode == "gibbs":
                 m = self.predictor.predict_gibbs(
-                    wixs, counts, n_iter, random_seed
+                    wixs, counts, n_iter, gibbs_burn_in, random_seed
                 )
-                m = m + self.doc_topic_prior
-                results[i] = m / m.sum()
+                results[i] = m
             else:
                 results[i] = self.predictor.predict_mf(
                     wixs, counts, n_iter, mf_tolerance
                 )
         return results
+
+class LabelledLDA(object):
+    def __init__(self, alpha=1e-2, epsilon=1e-30, topic_word_prior=None):
+        self.n_components = None
+        self.topic_word_prior = topic_word_prior
+        self.alpha = alpha
+        self.epsilon = 1e-20
+        self.n_vocabs = None
+        self.docstate_ = None
+        self.components_ = None
+
+    def fit(self, X, Y, n_iter=1000):
+        self._fit(X, Y, n_iter=n_iter)
+        return self
+
+    def fit_transform(self, X, Y, **kwargs):
+        result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
+        result /= result.sum(axis=1)[:, np.newaxis]
+        return result
+
+    def _fit(self, X, Y, n_iter=1000, ll_freq=10):
+        if isinstance(Y, np.ndarray):
+            Y = Y.astype(IntegerType)
+        else:
+            Y = Y.toarray().astype(IntegerType)
+
+        self.n_components = Y.shape[1]
+
+        self.topic_word_prior = number_to_array(
+            X.shape[1], 1 / float(self.n_components),
+            self.topic_word_prior
+        )
+
+        try:
+            count, dix, wix = check_array(X)
+        except:
+            print('Check for X failed.')
+            raise
+
+        doc_topic = np.zeros(
+            (X.shape[0], self.n_components), dtype=IntegerType)
+        word_topic = np.zeros(
+            (X.shape[1], self.n_components), dtype=IntegerType)
+
+        docstate = LabelledLDATrainer(
+            self.alpha,
+            self.epsilon,
+            Y,
+            count, dix, wix, self.n_components, 42
+        )
+        docstate.initialize(doc_topic, word_topic)
+
+        topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
+        self.components_ = word_topic.transpose()
+
+        with tqdm(range(n_iter)) as pbar:
+            for i in pbar:
+                docstate.iterate_gibbs(
+                    self.topic_word_prior,
+                    doc_topic,
+                    word_topic,
+                    topic_counts
+                )
+
+        self.component_ = word_topic.transpose()
+
+        predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
+
+        word_topic = word_topic + self.topic_word_priors[:, np.newaxis]
+        word_topic = word_topic.astype(RealType)
+        word_topic /= word_topic.sum(axis=0)[np.newaxis, :]
+        predictor.add_beta(word_topic)
+        self.predictor = predictor
+
+
+        return doc_topic
+

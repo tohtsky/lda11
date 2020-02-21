@@ -122,6 +122,40 @@ void LDATrainerBase::iterate_gibbs(
     }
 }
 
+RealMatrix LDATrainerBase::obtain_phi(
+        Eigen::Ref<RealVector> topic_word_prior, 
+        Eigen::Ref<IntegerMatrix> doc_topic, 
+        Eigen::Ref<IntegerMatrix> word_topic,
+        Eigen::Ref<IntegerVector> topic_counts 
+        ) {
+
+    RealMatrix result(n_topics_, word_topic.rows());
+    for(size_t i=0; i<=n_topics_;i++) {
+        result.row(i) = topic_word_prior.transpose();
+    }
+    Real eta_sum = topic_word_prior.sum();
+    RealVector p_(n_topics_);
+
+    for (auto & ws : word_states ) {
+        doc_topic(ws.doc_id, ws.topic_id)--;
+        word_topic(ws.word_id, ws.topic_id)--;
+        topic_counts(ws.topic_id)--;
+        p_ = (
+            word_topic.row(ws.word_id).cast<Real>().transpose().array() + topic_word_prior.array()
+        ).array() / ( topic_counts.cast<Real>().array() + eta_sum)  * (
+            doc_topic.row(ws.doc_id).cast<Real>().transpose().array() +
+            doc_topic_prior(ws.doc_id).array()
+        );
+        p_.array() /= p_.sum(); 
+        doc_topic(ws.doc_id, ws.topic_id)++;
+        word_topic(ws.word_id, ws.topic_id)++; 
+        topic_counts(ws.topic_id)++;
+        result.col(ws.word_id) += p_;
+    }
+    result.array().colwise() /= result.array().rowwise().sum();
+    return result;
+}
+
 Real LDATrainerBase::log_likelihood(
         Eigen::Ref<RealVector> topic_word_prior, 
         Eigen::Ref<IntegerMatrix> word_topic) { 
@@ -234,17 +268,25 @@ RealVector Predictor::predict_mf(
   return theta;
 }
 
-IntegerVector Predictor::predict_gibbs(
+RealVector Predictor::predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,
         std::size_t max_iter,
+        std::size_t burn_in,
         int random_seed
-){ 
+){
+    if (burn_in >= max_iter) {
+        throw std::invalid_argument("max_iter must be larger than burn_in.");
+    }
     //std::vector<Real> p_(n_topics_);
-    IntegerVector result(n_topics_);
+    IntegerVector current_state(n_topics_);
+    current_state.array() = 0;
+    RealVector result(n_topics_);
     result.array() = 0;
+
     UrandDevice urand_(random_seed);
     RealVector p_(n_topics_);
+    RealVector p_temp(n_topics_);
     std::vector<size_t> topics;
     for (size_t n = 0; n < n_domains_; n++) {
         IntegerVector & count = counts[n];
@@ -254,7 +296,7 @@ IntegerVector Predictor::predict_gibbs(
                 p_ = doc_topic_prior();
                 size_t init_topic = draw_from_p(p_, urand_); 
                 topics.push_back( init_topic );
-                result(init_topic)++;
+                current_state(init_topic)++;
             }
         }
     }
@@ -268,25 +310,36 @@ IntegerVector Predictor::predict_gibbs(
                 for (size_t k = 0; k < wcount ; k++ ) {
                     size_t current_topic = topics[current_iter]; 
 
-                    result(current_topic)--;
+                    current_state(current_topic)--;
 
                     p_ = (
                         betas_[n].row(wid).transpose().array() 
-                        * ( result.cast<Real>().array() + doc_topic_prior_.array() )
+                        * ( current_state.cast<Real>().array() + doc_topic_prior_.array() )
                     );
+                    if (iter_ >= burn_in) {
+                        p_temp.array() = p_.array() / p_.sum();
+                    }
+
 
                     current_topic = draw_from_p(
                         p_, urand_
                     );
 
-                    result(current_topic)++;
+                    current_state(current_topic)++;
                     topics[current_iter] = current_topic;
+                    if (iter_ >= burn_in) {
+                        //result(current_topic) ++;
+                        result += p_temp;
+                    }
 
                     current_iter++;
                 }
             }
         }
     }
+    result.array() /= (max_iter - burn_in);
+    result += doc_topic_prior_;
+    result.array() /= result.array().sum();
     return result;
 }
 

@@ -52,12 +52,17 @@ struct LDATrainerBase {
         Eigen::Ref<IntegerMatrix> word_topic
     );
 
+    RealMatrix obtain_phi(Eigen::Ref<RealVector> topic_word_prior,
+                          Eigen::Ref<IntegerMatrix> doc_topic,
+                          Eigen::Ref<IntegerMatrix> word_topic,
+                          Eigen::Ref<IntegerVector> topic_counts);
+
     private:
     std::vector<WordState> word_states;
     const std::size_t n_topics_;
     std::mt19937 random_state_;
     UrandDevice urand_;
-};
+    };
 
 struct LDATrainer: LDATrainerBase {
     LDATrainer (
@@ -114,10 +119,11 @@ struct Predictor {
     );
 
 
-    IntegerVector predict_gibbs(
+    RealVector predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,
         std::size_t iter,
+        std::size_t burn_in,
         int random_seed=42
     );
 
@@ -137,12 +143,13 @@ struct Predictor {
         return n_topics_;
     }
 
+    std::vector<RealMatrix> betas_;
+
     private:
 
     const std::size_t n_topics_; 
     RealVector doc_topic_prior_;
     std::size_t n_domains_;
-    std::vector<RealMatrix> betas_;
 };
 
 Real log_likelihood_doc_topic(

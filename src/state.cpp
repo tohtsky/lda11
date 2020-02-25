@@ -96,7 +96,8 @@ void LDATrainerBase::iterate_gibbs(
         Eigen::Ref<RealVector> topic_word_prior, 
         Eigen::Ref<IntegerMatrix> doc_topic, 
         Eigen::Ref<IntegerMatrix> word_topic,
-        Eigen::Ref<IntegerVector> topic_counts 
+        Eigen::Ref<IntegerVector> topic_counts,
+        std::function<void(double)> logger
         ) {
 
     Real eta_sum = topic_word_prior.sum();
@@ -120,6 +121,8 @@ void LDATrainerBase::iterate_gibbs(
         word_topic(ws.word_id, ws.topic_id)++; 
         topic_counts(ws.topic_id)++;
     }
+    logger(urand_.rand()); 
+
 }
 
 Real LDATrainerBase::log_likelihood(
@@ -231,13 +234,12 @@ RealVector Predictor::predict_mf(
   return theta;
 }
 
-IntegerVector Predictor::predict_gibbs(
+RealVector Predictor::predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,
         std::size_t max_iter,
         int random_seed
 ){ 
-    //std::vector<Real> p_(n_topics_);
     IntegerVector result(n_topics_);
     result.array() = 0;
     UrandDevice urand_(random_seed);
@@ -284,7 +286,9 @@ IntegerVector Predictor::predict_gibbs(
             }
         }
     }
-    return result;
+    RealVector normalized_result = result.cast<Real>() + doc_topic_prior_;
+    normalized_result /= normalized_result.sum();
+    return normalized_result;
 }
 
 Real log_likelihood_doc_topic (

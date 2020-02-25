@@ -1,7 +1,7 @@
 import numpy as np
 from numbers import Number
 from gc import collect
-from ._lda import LDATrainer, log_likelihood_doc_topic, Predictor, LabelledLDATrainer
+from ._lda import LDATrainer, log_likelihood_doc_topic, Predictor
 from tqdm import tqdm
 
 RealType = np.float64
@@ -46,6 +46,62 @@ def bow_row_to_counts(X, i):
         counts = X[i, wix].toarray().ravel()
 
     return counts.astype(IntegerType), wix.astype(IndexType)
+
+class LDAPredictorMixin:
+    """
+    self.components_
+    self.n_components
+    self.predictor
+    are needed
+    """
+    def transform(
+            self, *Xs,
+            n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10
+        ):
+        
+        n_domains = len(Xs)
+        if len(self.components_) != n_domains:
+            raise ValueError(f"Got {n_domains} input, while training was {len(self.components_)} domaints.")
+        shapes =  set({X.shape[0] for X in Xs if X is not None})
+        assert(len(shapes) == 1)
+        for shape in shapes: break
+
+        Xs_completed = []
+        for i, X in enumerate(Xs):
+            if X is not None:
+                Xs_completed.append(X)
+                continue
+
+            try:
+                from scipy import sparse as sps
+            except: 
+                raise RuntimeError('In ordere to use None as the default input for transform, scipy is needed.')
+
+
+            # X is None
+            X_zero = sps.csr_matrix((shape, self.components_[i].shape[1]))
+            Xs_completed.append(X_zero)
+        Xs = Xs_completed
+
+        results = np.zeros((shape, self.n_components), dtype=RealType)
+        for i in range(shape):
+            counts = []
+            wixs = []
+            for n in range(n_domains):
+                count, wix = bow_row_to_counts(Xs[n], i)
+                counts.append(count)
+                wixs.append(wix)
+            if mode == "gibbs": 
+                m = self.predictor.predict_gibbs(
+                    wixs, counts, n_iter, random_seed
+                )
+                m = m + self.doc_topic_prior
+                results[i] = m / m.sum()
+            else:
+                results[i] = self.predictor.predict_mf(
+                    wixs, counts, n_iter, mf_tolerance
+                )
+        return results
 
 
 class LDA(object):
@@ -103,6 +159,9 @@ class LDA(object):
         with tqdm(range(n_iter)) as pbar:
             pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
             for i in pbar:
+                def log(ll):
+                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
+
                 docstate.iterate_gibbs(
                     self.topic_word_prior,
                     doc_topic,
@@ -117,74 +176,11 @@ class LDA(object):
                         self.doc_topic_prior, doc_topic
                     ) 
 
-                    pbar.set_description("Log Likelihood = {0:.2f}".format(ll)) 
 
         return doc_topic
 
-class LabelledLDA(object):
-    def __init__(self, alpha=1e-2, epsilon=1e-30, topic_word_prior=None):
-        self.n_components = None
-        self.topic_word_prior = topic_word_prior
-        self.alpha = alpha 
-        self.epsilon = 1e-20
-        self.n_vocabs = None
-        self.docstate_ = None
-        self.components_ = None
 
-    def fit(self, X, Y, n_iter=1000): 
-        self._fit(X, Y, n_iter=n_iter)
-        return self
-
-    def fit_transform(self, X, Y, **kwargs):
-        result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
-        result /= result.sum(axis=1)[:, np.newaxis]
-        return result 
-
-    def _fit(self, X, Y, n_iter=1000, ll_freq=10):
-        if isinstance(Y, np.ndarray):
-            Y = Y.astype(IntegerType) 
-        else:
-            Y = Y.toarray().astype(IntegerType)
-
-        self.n_components = Y.shape[1]
-
-        self.topic_word_prior = number_to_array(
-            X.shape[1], 1 / float(self.n_components),
-            self.topic_word_prior
-        )
-
-        try:
-            count, dix, wix = check_array(X)
-        except:
-            print('Check for X failed.')
-            raise
-
-        doc_topic = np.zeros( (X.shape[0], self.n_components), dtype=IntegerType)
-        word_topic = np.zeros( (X.shape[1], self.n_components), dtype=IntegerType) 
-
-        docstate = LabelledLDATrainer(
-            self.alpha,
-            self.epsilon,
-            Y,
-            count, dix, wix, self.n_components, 42
-        )
-        docstate.initialize( doc_topic, word_topic )
-
-        topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
-        self.components_ = word_topic.transpose()
-
-        with tqdm(range(n_iter)) as pbar:
-            for i in pbar:
-                docstate.iterate_gibbs(
-                    self.topic_word_prior,
-                    doc_topic,
-                    word_topic,
-                    topic_counts
-                )
-        return doc_topic
-
-
-class MultipleContextLDA(object):
+class MultipleContextLDA(LDAPredictorMixin):
     def __init__(
         self, n_components=100, 
         doc_topic_prior=None, topic_word_priors=None
@@ -270,6 +266,9 @@ class MultipleContextLDA(object):
             )
 
         with tqdm(range(n_iter)) as pbar: 
+            def log_function(ll):
+                pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
+
             pbar.set_description("Log Likelihood = {0:.2f}".format(ll))
             for i in pbar:
                 for topic_word_prior, word_topic, docstate in zip(
@@ -279,7 +278,8 @@ class MultipleContextLDA(object):
                         topic_word_prior,
                         doc_topic,
                         word_topic,
-                        topic_counts
+                        topic_counts,
+                        log_function
                     )
                 if ( i + 1) % ll_freq == 0:
                     ll = log_likelihood_doc_topic( 
@@ -309,31 +309,5 @@ class MultipleContextLDA(object):
         self.predictor = predictor
 
         return doc_topic
-
-    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10):
-        n_domains = len(Xs)
-        shapes =  set({X.shape[0] for X in Xs})
-        assert(len(shapes) == 1)
-        for shape in shapes: break
-
-        results = np.zeros((shape, self.n_components), dtype=RealType)
-        for i in range(shape):
-            counts = []
-            wixs = []
-            for n in range(n_domains):
-                count, wix = bow_row_to_counts(Xs[n], i)
-                counts.append(count)
-                wixs.append(wix)
-            if mode == "gibbs": 
-                m = self.predictor.predict_gibbs(
-                    wixs, counts, n_iter, random_seed
-                )
-                m = m + self.doc_topic_prior
-                results[i] = m / m.sum()
-            else:
-                results[i] = self.predictor.predict_mf(
-                    wixs, counts, n_iter, mf_tolerance
-                )
-        return results
 
 

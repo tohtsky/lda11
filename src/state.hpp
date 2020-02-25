@@ -5,6 +5,7 @@
 #include <cmath>
 #include <Eigen/Core> 
 #include <unsupported/Eigen/SpecialFunctions>
+#include <functional>
 
 #include "./defs.hpp"
 
@@ -40,7 +41,8 @@ struct LDATrainerBase {
         Eigen::Ref<RealVector> topic_word_prior, 
         Eigen::Ref<IntegerMatrix> doc_topic, 
         Eigen::Ref<IntegerMatrix> word_topic,
-        Eigen::Ref<IntegerVector> topic_counts 
+        Eigen::Ref<IntegerVector> topic_counts,
+        std::function<void(double)> logger
     ); 
 
     virtual const RealVector & doc_topic_prior(
@@ -114,7 +116,7 @@ struct Predictor {
     );
 
 
-    IntegerVector predict_gibbs(
+    RealVector predict_gibbs(
         std::vector<IntegerVector> nonzeros,
         std::vector<IntegerVector> counts,
         std::size_t iter,

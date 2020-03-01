@@ -1,0 +1,10 @@
+eigen-eigen-323c052e1731/**
+build/*
+**__pycache__**
+tmp/**
+eigen3.zip
+**.pyc
+lda11.egg-info
+.vscode/*
+*.so
+test/*

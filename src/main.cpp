@@ -1,5 +1,8 @@
-#include "./defs.hpp"
-#include "./state.hpp"
+#include "defs.hpp"
+#include "predictor.hpp"
+#include "state.hpp"
+#include "trainer.hpp"
+
 #include "Eigen/Core"
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
@@ -14,7 +17,7 @@ PYBIND11_MODULE(_lda, m) {
   py::class_<LDATrainer>(m, "LDATrainer")
       .def(py::init<const RealVector &, Eigen::Ref<IntegerVector>,
                     Eigen::Ref<IndexVector>, Eigen::Ref<IndexVector>,
-                    const size_t, int>())
+                    const size_t, int, size_t>())
       .def("set_doc_topic_prior", &LDATrainer::set_doc_topic_prior)
       .def("initialize", &LDATrainer::initialize_count)
       .def("iterate_gibbs", &LDATrainer::iterate_gibbs)
@@ -28,6 +31,7 @@ PYBIND11_MODULE(_lda, m) {
       .def("initialize", &LDATrainer::initialize_count)
       .def("iterate_gibbs", &LDATrainer::iterate_gibbs)
       .def("log_likelihood", &LDATrainer::log_likelihood);
+
   m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
 
   py::class_<Predictor>(m, "Predictor")

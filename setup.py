@@ -57,7 +57,8 @@ class get_pybind_include(object):
 ext_modules = [
     Extension(
         'lda11._lda',
-        ['src/main.cpp', 'src/state.cpp'],
+        ['src/wrapper.cpp', 'src/state.cpp', 'src/predictor.cpp',
+            'src/trainer_base.cpp', 'src/trainer.cpp', 'src/child_worker.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),

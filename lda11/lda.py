@@ -73,12 +73,15 @@ def check_array(X):
 
         dix, wix = X.nonzero()
         counts = X[dix, wix]
-    else:
+    elif sps.issparse(X):
         # if X is either types of, scipy.sparse X has this attribute.
         X = X.tocsr()
         X.sort_indices()
         dix, wix = X.nonzero()
         counts = X.data
+    else:
+        raise ValueError(
+            "The input must be either np.ndarray or sparse array.")
     return counts.astype(IntegerType), dix.astype(IndexType), wix.astype(IndexType)
 
 
@@ -152,7 +155,8 @@ class MultipleContextLDA(LDAPredictorMixin):
     def __init__(
         self, n_components=100,
         doc_topic_prior=None, topic_word_priors=None,
-        n_iter=1000, optimize_interval=None, optimize_burn_in=None
+        n_iter=1000, optimize_interval=None, optimize_burn_in=None,
+        n_workers=1
     ):
         n_components = int(n_components)
         assert(n_iter >= 1)
@@ -176,6 +180,8 @@ class MultipleContextLDA(LDAPredictorMixin):
             else:
                 optimize_burn_in = optimize_burn_in
         self.optimize_burn_in = optimize_burn_in
+
+        self.n_workers = n_workers
 
     def fit(self, *X, **kwargs):
         self._fit(*X, **kwargs)
@@ -211,16 +217,15 @@ class MultipleContextLDA(LDAPredictorMixin):
 
         doc_tuples = []
         for X in Xs:
-            try:
-                doc_tuples.append(
-                    (check_array(X))
-                )
-            except:
-                print('Check for X failed.')
-                raise
+            doc_tuples.append(
+                (check_array(X))
+            )
 
         doc_topic = np.zeros(
             (X.shape[0], self.n_components), dtype=IntegerType)
+
+        topic_counts = np.zeros(self.n_components, dtype=IntegerType)
+
         word_topics = [
             np.zeros((X.shape[1], self.n_components), dtype=IntegerType)
             for X in Xs
@@ -230,12 +235,13 @@ class MultipleContextLDA(LDAPredictorMixin):
         for (count, dix, wix), word_topic in zip(doc_tuples, word_topics):
             docstate = LDATrainer(
                 self.doc_topic_prior,
-                count, dix, wix, self.n_components, 42
+                count, dix, wix, self.n_components, 42,
+                self.n_workers
             )
             docstates.append(docstate)
-            docstate.initialize(doc_topic, word_topic)
+            docstate.initialize(word_topic, doc_topic, topic_counts)
+        assert(doc_topic.sum() == sum([X.sum() for X in Xs]))
 
-        topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
         ll = log_likelihood_doc_topic(
             self.doc_topic_prior, doc_topic
         )
@@ -262,6 +268,8 @@ class MultipleContextLDA(LDAPredictorMixin):
                     ll = log_likelihood_doc_topic(
                         self.doc_topic_prior, doc_topic
                     )
+                    assert(doc_topic.min() >= 0)
+
                     for topic_word_prior, word_topic, docstate in zip(
                         self.topic_word_priors, word_topics, docstates
                     ):
@@ -337,7 +345,8 @@ class LDA(MultipleContextLDA):
         self, n_components=100,
         doc_topic_prior=None, topic_word_prior=None,
         n_iter=1000, optimize_burn_in=None,
-        optimize_interval=None
+        optimize_interval=None,
+        n_workers=1
     ):
         if topic_word_prior is not None:
             topic_word_priors = [topic_word_prior]
@@ -347,7 +356,8 @@ class LDA(MultipleContextLDA):
         super(LDA, self).__init__(
             n_components=n_components, doc_topic_prior=doc_topic_prior,
             topic_word_priors=topic_word_priors, n_iter=n_iter,
-            optimize_burn_in=optimize_burn_in, optimize_interval=optimize_interval
+            optimize_burn_in=optimize_burn_in, optimize_interval=optimize_interval,
+            n_workers=n_workers
         )
 
     def fit(self, X, **kwargs):
@@ -360,79 +370,3 @@ class LDA(MultipleContextLDA):
     @property
     def phi(self):
         return self.predictor.phis[0]
-
-
-class LabelledLDA(object):
-    def __init__(self, alpha=1e-2, epsilon=1e-30, topic_word_prior=None):
-        self.n_components = None
-        self.topic_word_prior = topic_word_prior
-        self.alpha = alpha
-        self.epsilon = 1e-20
-        self.n_vocabs = None
-        self.docstate_ = None
-        self.components_ = None
-
-    def fit(self, X, Y, n_iter=1000):
-        self._fit(X, Y, n_iter=n_iter)
-        return self
-
-    def fit_transform(self, X, Y, **kwargs):
-        result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
-        result /= result.sum(axis=1)[:, np.newaxis]
-        return result
-
-    def _fit(self, X, Y, n_iter=1000, ll_freq=10):
-        if isinstance(Y, np.ndarray):
-            Y = Y.astype(IntegerType)
-        else:
-            Y = Y.toarray().astype(IntegerType)
-
-        self.n_components = Y.shape[1]
-
-        self.topic_word_prior = number_to_array(
-            X.shape[1], 1 / float(self.n_components),
-            self.topic_word_prior
-        )
-
-        try:
-            count, dix, wix = check_array(X)
-        except:
-            print('Check for X failed.')
-            raise
-
-        doc_topic = np.zeros(
-            (X.shape[0], self.n_components), dtype=IntegerType)
-        word_topic = np.zeros(
-            (X.shape[1], self.n_components), dtype=IntegerType)
-
-        docstate = LabelledLDATrainer(
-            self.alpha,
-            self.epsilon,
-            Y,
-            count, dix, wix, self.n_components, 42
-        )
-        docstate.initialize(doc_topic, word_topic)
-
-        topic_counts = doc_topic.sum(axis=0).astype(IntegerType)
-        self.components_ = word_topic.transpose()
-
-        with tqdm(range(n_iter)) as pbar:
-            for i in pbar:
-                docstate.iterate_gibbs(
-                    self.topic_word_prior,
-                    doc_topic,
-                    word_topic,
-                    topic_counts
-                )
-
-        self.component_ = word_topic.transpose()
-
-        predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
-
-        word_topic = word_topic + self.topic_word_priors[:, np.newaxis]
-        word_topic = word_topic.astype(RealType)
-        word_topic /= word_topic.sum(axis=0)[np.newaxis, :]
-        predictor.add_beta(word_topic)
-        self.predictor = predictor
-
-        return doc_topic

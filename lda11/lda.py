@@ -1,7 +1,7 @@
 import numpy as np
 from numbers import Number
 from gc import collect
-from ._lda import LDATrainer, log_likelihood_doc_topic, Predictor
+from ._lda import LDATrainer, log_likelihood_doc_topic, Predictor, learn_dirichlet
 from tqdm import tqdm
 from scipy import sparse as sps
 from scipy.special import digamma
@@ -22,48 +22,6 @@ def number_to_array(n_components, default, arg=None):
         assert(arg.shape[0] == n_components)
         return arg.astype(RealType)
     return None
-
-
-def learn_dirichlet(arr, alpha_current, alpha_prior_scale=1, alpha_prior_exponent=1, iteration=50):
-    """
-    A detailed explanation for dirichlet-parameter learning is presented in:
-    https://tminka.github.io/papers/dirichlet/minka-dirichlet.pdf
-    """
-    alpha_current = alpha_current.copy()
-    alpha_sum = alpha_current.sum()
-
-    doc_lengths, doc_length_count = np.unique(
-        arr.sum(axis=1), return_counts=True)
-
-    max_token = arr.max()
-    d = sps.coo_matrix(arr)
-    count = d.data
-    doc_index = d.row
-    topic_index = d.col
-    topic_count_histogram = sps.coo_matrix(
-        (np.ones(count.shape[0], dtype=np.float64), (topic_index, count))
-    )
-    cnt_cnt = topic_count_histogram.data
-    topic = topic_count_histogram.row
-    cnt = topic_count_histogram.col
-    numerators = np.zeros_like(alpha_current)
-
-    for i in range(iteration):
-        numerators[:] = 0
-        denominator = (
-            digamma(doc_lengths + alpha_sum) - digamma(alpha_sum)
-        ).dot(doc_length_count)
-        dgs = (
-            digamma(cnt + alpha_current[topic]) - digamma(alpha_current)[topic]
-        ) * cnt_cnt
-        for topic_index, denom_contrib in zip(topic, dgs):
-            numerators[topic_index] += denom_contrib
-        alpha_current = (numerators * alpha_current + alpha_prior_exponent) / (
-            denominator + alpha_prior_scale
-        )
-        alpha_sum = alpha_current.sum()
-
-    return alpha_current
 
 
 def check_array(X):
@@ -284,8 +242,9 @@ class MultipleContextLDA(LDAPredictorMixin):
                     doc_topic_prior_new = learn_dirichlet(
                         doc_topic,
                         self.doc_topic_prior,
-                        alpha_prior_exponent=1.0,
-                        alpha_prior_scale=(1 / self.n_components)
+                        0.1,
+                        1 / float(self.n_components),
+                        100
                     )
                     self.doc_topic_prior = doc_topic_prior_new
                     docstate.set_doc_topic_prior(

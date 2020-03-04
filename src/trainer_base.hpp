@@ -18,7 +18,8 @@ struct LDATrainerBase {
                      Eigen::Ref<IntegerMatrix> word_topic,
                      Eigen::Ref<IntegerVector> topic_counts);
 
-  virtual const RealVector &doc_topic_prior(size_t doc_index) = 0;
+  virtual void obtain_doc_topic_prior(Eigen::Ref<RealVector>,
+                                      size_t doc_index) = 0;
 
   Real log_likelihood(Eigen::Ref<RealVector> topic_word_prior,
                       Eigen::Ref<IntegerMatrix> word_topic);

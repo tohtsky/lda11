@@ -13,12 +13,10 @@ struct LabelledLDATrainer : LDATrainerBase {
                      Eigen::Ref<IndexVector> dixs, Eigen::Ref<IndexVector> wixs,
                      size_t n_topics, int random_seed = 42);
 
-  virtual const RealVector &doc_topic_prior(size_t doc_index) override;
+  virtual void obtain_doc_topic_prior(Eigen::Ref<RealVector>,
+                                      size_t doc_index) override;
 
 private:
   Real alpha_, epsilon_;
   IntegerMatrix labels_;
 };
-
-Real log_likelihood_doc_topic(Eigen::Ref<RealVector> doc_topic_prior,
-                              Eigen::Ref<IntegerMatrix> doc_topic);

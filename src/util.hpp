@@ -1,6 +1,10 @@
 #pragma once
 
 #include "defs.hpp"
+#include <stdexcept>
+#include <tuple>
+#include <unordered_map>
+#include <unsupported/Eigen/SpecialFunctions>
 
 inline size_t binary_search(const Real *array, size_t size, Real value) {
   int lower = 0, upper = size - 1;
@@ -54,4 +58,8 @@ template <class ArrayType>
 inline size_t draw_from_p(ArrayType &array, UrandDevice &rand) {
   Real max = cumsum(array);
   return binary_search(array, max * rand.rand());
+}
+
+inline Eigen::Map<RealVector> vector_to_eigen(std::vector<Real> &v) {
+  return Eigen::Map<RealVector>(v.data(), v.size());
 }

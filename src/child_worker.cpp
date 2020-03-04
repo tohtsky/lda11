@@ -30,8 +30,7 @@ void LDATrainerBase::ChildWorker::initialize_count(size_t n_words) {
   word_topic_local.array() = 0;
   topic_counts_local.array() = 0;
   for (auto &ws : word_states_local) {
-    size_t dix_global = global_indices[ws.doc_id];
-    parent_->obtain_doc_topic_prior(temp_p, ws.doc_id);
+    temp_p = parent_->obtain_doc_topic_prior(ws.doc_id);
     ws.topic_id = draw_from_p(temp_p, urand_);
     doc_topic_local(ws.doc_id, ws.topic_id)++;
     word_topic_local(ws.word_id, ws.topic_id)++;
@@ -69,7 +68,7 @@ void LDATrainerBase::ChildWorker::sync_topic(
     const Eigen::Ref<IntegerVector> &topic_counts) {
   word_topic_local = word_topic_global;
   topic_counts_local = topic_counts;
-  for (auto internal_dix = 0; internal_dix < global_indices.size();
+  for (size_t internal_dix = 0; internal_dix < global_indices.size();
        internal_dix++) {
     size_t global_dix = global_indices[internal_dix];
     doc_topic_local.row(internal_dix) = doc_topic_global.row(global_dix);
@@ -86,14 +85,13 @@ void LDATrainerBase::ChildWorker::do_work(
     word_topic_local(ws.word_id, ws.topic_id)--;
     topic_counts_local(ws.topic_id)--;
     size_t global_dix = global_indices[ws.doc_id];
-    parent_->obtain_doc_topic_prior(p_, global_dix);
 
     p_ = (word_topic_local.row(ws.word_id).cast<Real>().transpose().array() +
           topic_word_prior.array())
              .array() /
          (topic_counts_local.cast<Real>().array() + eta_sum) *
          (doc_topic_local.row(ws.doc_id).cast<Real>().transpose().array() +
-          p_.array());
+          parent_->obtain_doc_topic_prior(global_dix).array());
 
     ws.topic_id = draw_from_p(p_, urand_);
 
@@ -115,13 +113,12 @@ RealMatrix LDATrainerBase::ChildWorker::obtain_phi(
     word_topic_local(ws.word_id, ws.topic_id)--;
     topic_counts_local(ws.topic_id)--;
     size_t global_dix = global_indices[ws.doc_id];
-    parent_->obtain_doc_topic_prior(p_, global_dix);
     p_ = (word_topic_local.row(ws.word_id).cast<Real>().transpose().array() +
           topic_word_prior.array())
              .array() /
          (topic_counts_local.cast<Real>().array() + eta_sum) *
          (doc_topic_local.row(ws.doc_id).cast<Real>().transpose().array() +
-          p_.array());
+          parent_->obtain_doc_topic_prior(global_dix).array());
 
     p_.array() /= p_.sum();
     doc_topic_local(ws.doc_id, ws.topic_id)++;

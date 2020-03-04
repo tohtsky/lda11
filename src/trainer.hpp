@@ -22,8 +22,7 @@ private:
     int random_seed;
   };
 
-  virtual void obtain_doc_topic_prior(Eigen::Ref<RealVector>,
-                                      size_t doc_index) override;
+  virtual const RealVector & obtain_doc_topic_prior(size_t doc_index) override;
   std::vector<std::unique_ptr<ChildWorker>> children;
 
 private:

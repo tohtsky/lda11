@@ -2,8 +2,8 @@
 #include "util.hpp"
 Predictor::Predictor(size_t n_topics, const RealVector &doc_topic_prior,
                      int random_seed)
-    : n_topics_(n_topics), doc_topic_prior_(doc_topic_prior), n_domains_(0),
-      betas_() {}
+    : betas_(), n_topics_(n_topics), doc_topic_prior_(doc_topic_prior),
+      n_domains_(0) {}
 
 void Predictor::add_beta(const RealMatrix &beta) {
   betas_.push_back(beta);

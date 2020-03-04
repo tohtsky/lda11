@@ -74,7 +74,7 @@ RealVector learn_dirichlet(const Eigen::Ref<IntegerMatrix> &counts,
             .matrix()
             .transpose() *
         vector_to_eigen(doc_length_freq);
-    for (size_t topic_index = 0; topic_index < n_topic; topic_index++) {
+    for (int topic_index = 0; topic_index < n_topic; topic_index++) {
       Real numerator = ((vector_to_eigen(topic_cnt[topic_index]).array() +
                          alpha_current(topic_index))
                             .digamma() -

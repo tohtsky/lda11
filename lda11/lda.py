@@ -226,7 +226,6 @@ class MultipleContextLDA(LDAPredictorMixin):
                     ll = log_likelihood_doc_topic(
                         self.doc_topic_prior, doc_topic
                     )
-                    assert(doc_topic.min() >= 0)
 
                     for topic_word_prior, word_topic, docstate in zip(
                         self.topic_word_priors, word_topics, docstates

@@ -61,7 +61,7 @@ void LDATrainerBase::initialize_count(Eigen::Ref<IntegerMatrix> word_topic,
   if (children.empty()) {
     RealVector temp_p(n_topics_);
     for (auto &ws : word_states) {
-      obtain_doc_topic_prior(temp_p, ws.doc_id);
+      temp_p = obtain_doc_topic_prior(ws.doc_id);
       ws.topic_id = draw_from_p(temp_p, urand_);
       doc_topic(ws.doc_id, ws.topic_id)++;
       word_topic(ws.word_id, ws.topic_id)++;
@@ -76,7 +76,7 @@ void LDATrainerBase::initialize_count(Eigen::Ref<IntegerMatrix> word_topic,
 }
 
 void LDATrainerBase::iterate_gibbs(
-    const Eigen::Ref<RealVector> &topic_word_prior,
+    Eigen::Ref<RealVector> topic_word_prior,
     Eigen::Ref<IntegerMatrix> doc_topic, Eigen::Ref<IntegerMatrix> word_topic,
     Eigen::Ref<IntegerVector> topic_counts) {
 
@@ -89,14 +89,13 @@ void LDATrainerBase::iterate_gibbs(
       word_topic(ws.word_id, ws.topic_id)--;
       topic_counts(ws.topic_id)--;
 
-      obtain_doc_topic_prior(p_, ws.doc_id);
 
       p_ = (word_topic.row(ws.word_id).cast<Real>().transpose().array() +
             topic_word_prior.array())
                .array() /
            (topic_counts.cast<Real>().array() + eta_sum) *
            (doc_topic.row(ws.doc_id).cast<Real>().transpose().array() +
-            p_.array());
+            obtain_doc_topic_prior(ws.doc_id).array());
 
       ws.topic_id = draw_from_p(p_, urand_);
 
@@ -141,13 +140,12 @@ LDATrainerBase::obtain_phi(const Eigen::Ref<RealVector> &topic_word_prior,
       doc_topic(ws.doc_id, ws.topic_id)--;
       word_topic(ws.word_id, ws.topic_id)--;
       topic_counts(ws.topic_id)--;
-      obtain_doc_topic_prior(p_, ws.doc_id);
       p_ = (word_topic.row(ws.word_id).cast<Real>().transpose().array() +
             topic_word_prior.array())
                .array() /
            (topic_counts.cast<Real>().array() + eta_sum) *
            (doc_topic.row(ws.doc_id).cast<Real>().transpose().array() +
-            p_.array());
+            obtain_doc_topic_prior(ws.doc_id).array());
 
       p_.array() /= p_.sum();
       doc_topic(ws.doc_id, ws.topic_id)++;

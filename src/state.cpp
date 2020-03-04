@@ -12,8 +12,7 @@ LabelledLDATrainer::LabelledLDATrainer(Real alpha, Real epsilon,
     : LDATrainerBase(counts, dixs, wixs, n_topics, random_seed), alpha_(alpha),
       epsilon_(epsilon), labels_(labels) {}
 
-void LabelledLDATrainer::obtain_doc_topic_prior(Eigen::Ref<RealVector> target,
-                                                size_t doc_index) {
-  target = (labels_.row(doc_index).cast<Real>().array() * alpha_ + epsilon_)
+const RealVector & LabelledLDATrainer::obtain_doc_topic_prior(size_t doc_index) {
+  return (labels_.row(doc_index).cast<Real>().array() * alpha_ + epsilon_)
                .transpose();
 }

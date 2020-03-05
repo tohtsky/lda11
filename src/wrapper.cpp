@@ -120,14 +120,6 @@ PYBIND11_MODULE(_lda, m) {
       .def("obtain_phi", &LDATrainer::obtain_phi)
       .def("log_likelihood", &LDATrainer::log_likelihood);
 
-  py::class_<LabelledLDATrainer>(m, "LabelledLDATrainer")
-      .def(py::init<Real, Real, const IntegerMatrix &,
-                    Eigen::Ref<IntegerVector>, Eigen::Ref<IndexVector>,
-                    Eigen::Ref<IndexVector>, const size_t, int>())
-      .def("initialize", &LDATrainer::initialize_count)
-      .def("iterate_gibbs", &LDATrainer::iterate_gibbs)
-      .def("log_likelihood", &LDATrainer::log_likelihood);
-
   m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
   m.def("learn_dirichlet", &learn_dirichlet);
 

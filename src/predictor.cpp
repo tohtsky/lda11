@@ -57,7 +57,7 @@ RealVector Predictor::predict_mf(std::vector<IntegerVector> nonzeros,
 RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
                                     std::vector<IntegerVector> counts,
                                     std::size_t max_iter, std::size_t burn_in,
-                                    int random_seed) {
+                                    int random_seed, bool use_cgs_p) {
   if (burn_in >= max_iter) {
     throw std::invalid_argument("max_iter must be larger than burn_in.");
   }
@@ -98,7 +98,7 @@ RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
           p_ =
               (betas_[n].row(wid).transpose().array() *
                (current_state.cast<Real>().array() + doc_topic_prior_.array()));
-          if (iter_ >= burn_in) {
+          if ((iter_ >= burn_in) && use_cgs_p) {
             p_temp.array() = p_.array() / p_.sum();
           }
 
@@ -107,8 +107,11 @@ RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
           current_state(current_topic)++;
           topics[current_iter] = current_topic;
           if (iter_ >= burn_in) {
-            // result(current_topic) ++;
-            result += p_temp;
+            if (use_cgs_p) {
+              result += p_temp;
+            } else {
+              result(current_topic)++;
+            }
           }
 
           current_iter++;

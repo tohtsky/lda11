@@ -2,6 +2,7 @@
 #include <random>
 
 #include <Eigen/Core>
+#include <Eigen/Sparse>
 #include <unsupported/Eigen/SpecialFunctions>
 
 using Real = double;
@@ -12,6 +13,7 @@ using IntegerMatrix =
 using IntegerVector = Eigen::Matrix<Integer, Eigen::Dynamic, 1>;
 
 using IndexVector = Eigen::Matrix<size_t, Eigen::Dynamic, 1>;
+using SparseIntegerMatrix = Eigen::SparseMatrix<Integer, Eigen::RowMajor>;
 
 using RealMatrix = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 using RealVector = Eigen::Matrix<Real, Eigen::Dynamic, 1>;

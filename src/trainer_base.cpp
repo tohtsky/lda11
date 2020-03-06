@@ -54,6 +54,8 @@ LDATrainerBase::LDATrainerBase(Eigen::Ref<IntegerVector> counts,
   }
 }
 
+LDATrainerBase::~LDATrainerBase() {}
+
 void LDATrainerBase::initialize_count(Eigen::Ref<IntegerMatrix> word_topic,
                                       Eigen::Ref<IntegerMatrix> doc_topic,
                                       Eigen::Ref<IntegerVector> topic_counts) {
@@ -75,10 +77,10 @@ void LDATrainerBase::initialize_count(Eigen::Ref<IntegerMatrix> word_topic,
   }
 }
 
-void LDATrainerBase::iterate_gibbs(
-    Eigen::Ref<RealVector> topic_word_prior,
-    Eigen::Ref<IntegerMatrix> doc_topic, Eigen::Ref<IntegerMatrix> word_topic,
-    Eigen::Ref<IntegerVector> topic_counts) {
+void LDATrainerBase::iterate_gibbs(Eigen::Ref<RealVector> topic_word_prior,
+                                   Eigen::Ref<IntegerMatrix> doc_topic,
+                                   Eigen::Ref<IntegerMatrix> word_topic,
+                                   Eigen::Ref<IntegerVector> topic_counts) {
 
   if (children.empty()) {
     Real eta_sum = topic_word_prior.sum();
@@ -88,7 +90,6 @@ void LDATrainerBase::iterate_gibbs(
       doc_topic(ws.doc_id, ws.topic_id)--;
       word_topic(ws.word_id, ws.topic_id)--;
       topic_counts(ws.topic_id)--;
-
 
       p_ = (word_topic.row(ws.word_id).cast<Real>().transpose().array() +
             topic_word_prior.array())

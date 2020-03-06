@@ -114,7 +114,7 @@ class MultipleContextLDA(LDAPredictorMixin):
         self, n_components=100,
         doc_topic_prior=None, topic_word_priors=None,
         n_iter=1000, optimize_interval=None, optimize_burn_in=None,
-        n_workers=1
+        n_workers=1, use_cgs_p=True
     ):
         n_components = int(n_components)
         assert(n_iter >= 1)
@@ -129,6 +129,7 @@ class MultipleContextLDA(LDAPredictorMixin):
         self.n_modals = None
 
         self.predictor = None
+        self.use_cgs_p = use_cgs_p
 
         self.n_iter = n_iter
         self.optimize_interval = optimize_interval
@@ -198,10 +199,10 @@ class MultipleContextLDA(LDAPredictorMixin):
             )
             docstates.append(docstate)
             docstate.initialize(word_topic, doc_topic, topic_counts)
-        assert(doc_topic.sum() == sum([X.sum() for X in Xs]))
+        doc_length = doc_topic.sum(axis=1).astype(IntegerType)
 
         ll = log_likelihood_doc_topic(
-            self.doc_topic_prior, doc_topic
+            self.doc_topic_prior, doc_topic, doc_length
         )
         for topic_word_prior, word_topic, docstate in zip(
             self.topic_word_priors, word_topics, docstates
@@ -224,7 +225,7 @@ class MultipleContextLDA(LDAPredictorMixin):
                     )
                 if (i + 1) % ll_freq == 0:
                     ll = log_likelihood_doc_topic(
-                        self.doc_topic_prior, doc_topic
+                        self.doc_topic_prior, doc_topic, doc_length
                     )
 
                     for topic_word_prior, word_topic, docstate in zip(
@@ -253,12 +254,17 @@ class MultipleContextLDA(LDAPredictorMixin):
         predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
 
         for i, (twp, wt, docstate) in enumerate(zip(self.topic_word_priors, word_topics, docstates)):
-            phi = docstate.obtain_phi(
-                twp,
-                doc_topic,
-                wt,
-                topic_counts
-            )
+            if self.use_cgs_p:
+                phi = docstate.obtain_phi(
+                    twp,
+                    doc_topic,
+                    wt,
+                    topic_counts
+                )
+            else:
+                phi = wt + twp[:, np.newaxis]
+                phi /= phi.sum(axis=0)[np.newaxis, :]
+                phi = phi.transpose()
             predictor.add_beta(phi.transpose())
 
         self.predictor = predictor
@@ -269,7 +275,7 @@ class MultipleContextLDA(LDAPredictorMixin):
     def phis(self):
         return self.predictor.phis
 
-    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10, gibbs_burn_in=10):
+    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10, gibbs_burn_in=10, use_cgs_p=True):
         n_domains = len(Xs)
         shapes = set({X.shape[0] for X in Xs})
         assert(len(shapes) == 1)
@@ -286,7 +292,7 @@ class MultipleContextLDA(LDAPredictorMixin):
                 wixs.append(wix)
             if mode == "gibbs":
                 m = self.predictor.predict_gibbs(
-                    wixs, counts, n_iter, gibbs_burn_in, random_seed
+                    wixs, counts, n_iter, gibbs_burn_in, random_seed, use_cgs_p
                 )
                 results[i] = m
             else:
@@ -304,7 +310,7 @@ class LDA(MultipleContextLDA):
         doc_topic_prior=None, topic_word_prior=None,
         n_iter=1000, optimize_burn_in=None,
         optimize_interval=None,
-        n_workers=1
+        n_workers=1, use_cgs_p=True
     ):
         if topic_word_prior is not None:
             topic_word_priors = [topic_word_prior]
@@ -315,7 +321,7 @@ class LDA(MultipleContextLDA):
             n_components=n_components, doc_topic_prior=doc_topic_prior,
             topic_word_priors=topic_word_priors, n_iter=n_iter,
             optimize_burn_in=optimize_burn_in, optimize_interval=optimize_interval,
-            n_workers=n_workers
+            n_workers=n_workers, use_cgs_p=use_cgs_p
         )
 
     def fit(self, X, **kwargs):

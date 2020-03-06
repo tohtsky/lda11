@@ -1,17 +1,57 @@
 #include "defs.hpp"
 #include "predictor.hpp"
+#include "pybind11/attr.h"
 #include "state.hpp"
 #include "trainer.hpp"
 
-#include "Eigen/Core"
 #include "util.hpp"
+#include <Eigen/Core>
+#include <Eigen/Sparse>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <random>
+#include <stdexcept>
+#include <tuple>
 #include <vector>
 
 namespace py = pybind11;
+std::pair<SparseIntegerMatrix, SparseIntegerMatrix>
+train_test_split(const SparseIntegerMatrix &X, const double test_ratio,
+                 std::int64_t random_seed) {
+  using Triplet = Eigen::Triplet<Integer>;
+  std::mt19937 random_state(random_seed);
+  if (test_ratio > 1.0 || test_ratio < 0)
+    throw std::invalid_argument("test_ratio must be within [0, 1]");
+  std::vector<Integer> buffer;
+  std::vector<Triplet> train_data, test_data;
+  for (int row = 0; row < X.outerSize(); ++row) {
+    buffer.clear(); // does not change capacity
+    Integer cnt = 0;
+    for (SparseIntegerMatrix::InnerIterator it(X, row); it; ++it) {
+      cnt += it.value();
+      for (int i = 0; i < it.value(); i++) {
+        buffer.push_back(it.col());
+      }
+    }
+    std::shuffle(buffer.begin(), buffer.end(), random_state);
+    size_t n_test = static_cast<Integer>(std::floor(cnt * test_ratio));
+    for (size_t i = 0; i < n_test; i++) {
+      test_data.emplace_back(row, buffer[i], 1);
+    }
+    for (size_t i = n_test; i < buffer.size(); i++) {
+      train_data.emplace_back(row, buffer[i], 1);
+    }
+  }
+  SparseIntegerMatrix X_train(X.rows(), X.cols()), X_test(X.rows(), X.cols());
+  auto dupfunction = [](const Integer &a, const Integer &b) { return a + b; };
+  X_train.setFromTriplets(train_data.begin(), train_data.end(), dupfunction);
+  X_test.setFromTriplets(test_data.begin(), test_data.end(), dupfunction);
+  return {X_train, X_test};
+}
 
 RealVector learn_dirichlet(const Eigen::Ref<IntegerMatrix> &counts,
                            const Eigen::Ref<RealVector> &alpha_start,
@@ -91,20 +131,20 @@ RealVector learn_dirichlet(const Eigen::Ref<IntegerMatrix> &counts,
   return alpha_current;
 }
 
-Real log_likelihood_doc_topic(Eigen::Ref<RealVector> doc_topic_prior,
-                              Eigen::Ref<IntegerMatrix> doc_topic) {
+Real log_likelihood_doc_topic(const Eigen::Ref<RealVector> &doc_topic_prior,
+                              const Eigen::Ref<IntegerMatrix> &doc_topic,
+                              const Eigen::Ref<IntegerVector> &doc_length) {
   size_t n_doc = doc_topic.rows();
-  size_t n_topics = doc_topic.cols();
   Real ll = n_doc * (std::lgamma(doc_topic_prior.sum()) -
                      doc_topic_prior.array().lgamma().sum());
+  Real doc_topic_sum = doc_topic_prior.array().sum();
 
-  RealArray exponent(n_topics);
-  for (size_t i = 0; i < n_doc; i++) {
-    exponent = doc_topic.row(i).cast<Real>().transpose().array() +
-               doc_topic_prior.array();
-    ll += exponent.lgamma().sum();
-    ll -= std::lgamma(exponent.sum());
-  }
+  ll += (doc_topic.array().cast<Real>().rowwise() +
+         doc_topic_prior.transpose().array())
+            .lgamma()
+            .sum();
+  ll -= (doc_length.array().cast<Real>() + doc_topic_sum).lgamma().sum();
+
   return ll;
 }
 
@@ -122,6 +162,7 @@ PYBIND11_MODULE(_lda, m) {
 
   m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
   m.def("learn_dirichlet", &learn_dirichlet);
+  m.def("train_test_split", &train_test_split);
 
   py::class_<Predictor>(m, "Predictor")
       .def(py::init<size_t, const RealVector &, int>())

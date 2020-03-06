@@ -13,7 +13,8 @@ struct Predictor {
 
   RealVector predict_gibbs(std::vector<IntegerVector> nonzeros,
                            std::vector<IntegerVector> counts, std::size_t iter,
-                           std::size_t burn_in, int random_seed = 42);
+                           std::size_t burn_in, int random_seed = 42,
+                           bool use_cgs_p = true);
 
   const RealVector &doc_topic_prior() const { return doc_topic_prior_; }
 

@@ -8,6 +8,7 @@ struct LDATrainerBase {
   LDATrainerBase(Eigen::Ref<IntegerVector> counts, Eigen::Ref<IndexVector> dixs,
                  Eigen::Ref<IndexVector> wixs, size_t n_topics,
                  int random_seed = 42, size_t n_workers = 1);
+  virtual ~LDATrainerBase();
 
   void initialize_count(Eigen::Ref<IntegerMatrix> word_topic,
                         Eigen::Ref<IntegerMatrix> doc_topic,
@@ -18,7 +19,7 @@ struct LDATrainerBase {
                      Eigen::Ref<IntegerMatrix> word_topic,
                      Eigen::Ref<IntegerVector> topic_counts);
 
-  virtual const RealVector & obtain_doc_topic_prior(size_t doc_index) = 0;
+  virtual const RealVector &obtain_doc_topic_prior(size_t doc_index) = 0;
 
   Real log_likelihood(Eigen::Ref<RealVector> topic_word_prior,
                       Eigen::Ref<IntegerMatrix> word_topic);

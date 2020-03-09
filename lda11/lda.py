@@ -1,7 +1,7 @@
 import numpy as np
 from numbers import Number
 from gc import collect
-from ._lda import LDATrainer, log_likelihood_doc_topic, Predictor, learn_dirichlet
+from ._lda import LDATrainer, log_likelihood_doc_topic, Predictor, learn_dirichlet, learn_dirichlet_symmetric
 from tqdm import tqdm
 from scipy import sparse as sps
 from scipy.special import digamma
@@ -11,7 +11,7 @@ IntegerType = np.int32
 IndexType = np.uint64
 
 
-def number_to_array(n_components, default, arg=None):
+def number_to_array(n_components, default, arg=None, ensure_symmetry=False):
     if arg is None:
         arg = default
     if isinstance(arg, Number):
@@ -20,6 +20,8 @@ def number_to_array(n_components, default, arg=None):
         ) * RealType(arg)
     elif isinstance(arg, np.ndarray):
         assert(arg.shape[0] == n_components)
+        if ensure_symmetry and np.unique(arg).shape[0] > 1:
+            raise ValueError("Symmetric array required.")
         return arg.astype(RealType)
     return None
 
@@ -114,7 +116,7 @@ class MultipleContextLDA(LDAPredictorMixin):
         self, n_components=100,
         doc_topic_prior=None, topic_word_priors=None,
         n_iter=1000, optimize_interval=None, optimize_burn_in=None,
-        n_workers=1, use_cgs_p=True
+        n_workers=1, use_cgs_p=True, is_phi_symmetric=True
     ):
         n_components = int(n_components)
         assert(n_iter >= 1)
@@ -123,6 +125,7 @@ class MultipleContextLDA(LDAPredictorMixin):
 
         self.doc_topic_prior = doc_topic_prior
         self.topic_word_priors = topic_word_priors
+        self.is_phi_symmetric = is_phi_symmetric
         self.n_vocabs = None
         self.docstate_ = None
         self.components_ = None
@@ -170,6 +173,7 @@ class MultipleContextLDA(LDAPredictorMixin):
         self.topic_word_priors = [
             number_to_array(
                 X.shape[1], 1 / float(self.n_components),
+                ensure_symmetry=self.is_phi_symmetric
             )
             for X, val in zip(Xs, self.topic_word_priors)
         ]
@@ -246,6 +250,23 @@ class MultipleContextLDA(LDAPredictorMixin):
                         1 / float(self.n_components),
                         100
                     )
+                    if self.is_phi_symmetric:
+                        topic_word_prior_new = np.ones_like(topic_word_prior) * learn_dirichlet_symmetric(
+                            word_topic.transpose().copy(),
+                            topic_word_prior.mean(),
+                            0.1,
+                            1 / float(self.n_components),
+                            100
+                        )
+                    else:
+                        topic_word_prior_new = learn_dirichlet(
+                            word_topic.transpose().copy(),
+                            topic_word_prior,
+                            0.1,
+                            1 / float(self.n_components),
+                            100
+                        )
+                    topic_word_prior[:] = topic_word_prior_new
                     self.doc_topic_prior = doc_topic_prior_new
                     docstate.set_doc_topic_prior(
                         doc_topic_prior_new
@@ -310,7 +331,7 @@ class LDA(MultipleContextLDA):
         doc_topic_prior=None, topic_word_prior=None,
         n_iter=1000, optimize_burn_in=None,
         optimize_interval=None,
-        n_workers=1, use_cgs_p=True
+        n_workers=1, use_cgs_p=True, is_phi_symmetric=True
     ):
         if topic_word_prior is not None:
             topic_word_priors = [topic_word_prior]
@@ -321,7 +342,8 @@ class LDA(MultipleContextLDA):
             n_components=n_components, doc_topic_prior=doc_topic_prior,
             topic_word_priors=topic_word_priors, n_iter=n_iter,
             optimize_burn_in=optimize_burn_in, optimize_interval=optimize_interval,
-            n_workers=n_workers, use_cgs_p=use_cgs_p
+            n_workers=n_workers, use_cgs_p=use_cgs_p,
+            is_phi_symmetric=is_phi_symmetric
         )
 
     def fit(self, X, **kwargs):

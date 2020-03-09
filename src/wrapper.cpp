@@ -131,6 +131,75 @@ RealVector learn_dirichlet(const Eigen::Ref<IntegerMatrix> &counts,
   return alpha_current;
 }
 
+Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
+                               Real alpha_start, Real alpha_prior_scale,
+                               Real alpha_prior_exponent, size_t iteration) {
+  using Eigen::numext::digamma;
+  using std::vector;
+  const int n_topic = counts.cols();
+  const int n_docs = counts.rows();
+  if (counts.cols() != n_topic) {
+    throw std::invalid_argument("count array and alpha have different sizes.");
+  }
+  Real alpha_current(alpha_start);
+  Real numerator;
+
+  vector<Real> doc_length;
+  vector<Real> doc_length_freq;
+
+  vector<Real> topic_cnt;
+  vector<Real> topic_cnt_freq;
+
+  {
+    using Map = std::unordered_map<Integer, Real>; // cnt, freq
+    Map doc_length_hist;
+    Map topic_cnt_hist;
+
+    for (int dix = 0; dix < n_docs; dix++) {
+      int length = 0;
+      for (int topic = 0; topic < n_topic; topic++) {
+        Integer cnt = counts(dix, topic);
+        if (cnt == 0) {
+          continue;
+        }
+        topic_cnt_hist[cnt]++;
+        length += cnt;
+      }
+      doc_length_hist[length]++;
+    }
+
+    for (auto &cnt_freq : topic_cnt_hist) {
+      topic_cnt.push_back(cnt_freq.first);
+      topic_cnt_freq.push_back(cnt_freq.second);
+    }
+
+    for (auto &iter : doc_length_hist) {
+      doc_length.push_back(iter.first);
+      doc_length_freq.push_back(iter.second);
+    }
+  }
+  for (size_t it = 0; it < iteration; it++) {
+    Real alpha_sum = n_topic * alpha_current;
+    numerator = 0;
+    Real denominator =
+        ((vector_to_eigen(doc_length).array() + alpha_sum).digamma() -
+         digamma(alpha_sum))
+            .matrix()
+            .transpose() *
+        vector_to_eigen(doc_length_freq);
+    Real numerator =
+        ((vector_to_eigen(topic_cnt).array() + alpha_current).digamma() -
+         digamma(alpha_current))
+            .matrix()
+            .transpose() *
+        vector_to_eigen(topic_cnt_freq);
+    alpha_current = (alpha_current * numerator + alpha_prior_exponent) /
+                    (denominator + alpha_prior_scale) / n_topic;
+  }
+
+  return alpha_current;
+}
+
 Real log_likelihood_doc_topic(const Eigen::Ref<RealVector> &doc_topic_prior,
                               const Eigen::Ref<IntegerMatrix> &doc_topic,
                               const Eigen::Ref<IntegerVector> &doc_length) {
@@ -162,6 +231,8 @@ PYBIND11_MODULE(_lda, m) {
 
   m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
   m.def("learn_dirichlet", &learn_dirichlet);
+  m.def("learn_dirichlet_symmetric", &learn_dirichlet_symmetric);
+
   m.def("train_test_split", &train_test_split);
 
   py::class_<Predictor>(m, "Predictor")

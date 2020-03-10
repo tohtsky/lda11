@@ -239,6 +239,7 @@ PYBIND11_MODULE(_lda, m) {
       .def(py::init<size_t, const RealVector &, int>())
       .def("add_beta", &Predictor::add_beta)
       .def("predict_gibbs", &Predictor::predict_gibbs)
+      .def("predict_gibbs_batch", &Predictor::predict_gibbs_batch)
       .def("predict_mf", &Predictor::predict_mf)
       .def_readonly("phis", &Predictor::betas_)
       .def("__getstate__",

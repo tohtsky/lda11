@@ -1,5 +1,11 @@
 #include "predictor.hpp"
+#include "defs.hpp"
 #include "util.hpp"
+#include <cstddef>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <thread>
 Predictor::Predictor(size_t n_topics, const RealVector &doc_topic_prior,
                      int random_seed)
     : betas_(), n_topics_(n_topics), doc_topic_prior_(doc_topic_prior),
@@ -122,5 +128,109 @@ RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
   result.array() /= (max_iter - burn_in);
   result += doc_topic_prior_;
   result.array() /= result.array().sum();
+  return result;
+}
+
+RealMatrix Predictor::predict_gibbs_batch(std::vector<SparseIntegerMatrix> Xs,
+                                          std::size_t max_iter,
+                                          std::size_t burn_in, int random_seed,
+                                          bool use_cgs_p, size_t n_workers) {
+  if (n_workers == 0) {
+    throw std::invalid_argument("n_workes must be greater than 0.");
+  }
+
+  if (burn_in >= max_iter) {
+    throw std::invalid_argument("max_iter must be larger than burn_in.");
+  }
+  size_t n_domains_ = Xs.size();
+  if (n_domains_ == 0) {
+    throw std::invalid_argument("No input.");
+  }
+  int shape = Xs[0].rows();
+  for (size_t i = 1; i < n_domains_; i++) {
+    if (shape != Xs[i].rows()) {
+      throw std::invalid_argument("non-uniform shape for Xs.");
+    }
+  }
+  for (int i = 0; i < Xs.size(); i++) {
+    Xs[i].makeCompressed();
+  }
+  RealMatrix result(shape, n_topics_);
+  result.array() = 0;
+  std::vector<std::thread> workers;
+
+  for (size_t worker_index = 0; worker_index < n_workers; worker_index++) {
+    workers.emplace_back([this, n_domains_, worker_index, n_workers, shape, &Xs,
+                          &result, random_seed, max_iter, burn_in,
+                          use_cgs_p]() {
+      std::vector<std::vector<std::pair<size_t, size_t>>> word_states(
+          n_domains_);
+      IntegerVector current_state(n_topics_);
+      RealVector p_(n_topics_);
+      RealVector p_temp(n_topics_);
+      for (int d = worker_index; d < shape; d += n_workers) {
+        current_state.array() = 0;
+
+        UrandDevice urand_(random_seed);
+
+        size_t tot = 0;
+        for (size_t n = 0; n < n_domains_; n++) {
+          word_states[n].clear(); // initialize
+          for (SparseIntegerMatrix::InnerIterator iter(Xs[n], d); iter;
+               ++iter) {
+            size_t wid = iter.col();
+            size_t cnt = iter.value();
+            for (size_t c = 0; c < cnt; c++) {
+              p_ = doc_topic_prior();
+              size_t init_topic = draw_from_p(p_, urand_);
+              word_states[n].emplace_back(wid, init_topic);
+              current_state(init_topic)++;
+            }
+            tot += cnt;
+          }
+        }
+
+        for (size_t iter_ = 0; iter_ < max_iter; iter_++) {
+          size_t current_iter = 0;
+          for (size_t n = 0; n < n_domains_; n++) {
+            auto &ws = word_states[n];
+            for (size_t j = 0; j < ws.size(); j++) {
+              size_t wid = ws[j].first;
+
+              size_t current_topic = ws[j].second;
+              current_state(current_topic)--;
+
+              p_ = (betas_[n].row(wid).transpose().array() *
+                    (current_state.cast<Real>().array() +
+                     doc_topic_prior_.array()));
+              if ((iter_ >= burn_in) && use_cgs_p) {
+                p_temp.array() = p_.array() / p_.sum();
+              }
+
+              current_topic = draw_from_p(p_, urand_);
+
+              current_state(current_topic)++;
+              ws[j].second = current_topic;
+              if (iter_ >= burn_in) {
+                if (use_cgs_p) {
+                  result.row(d) += p_temp.transpose();
+                } else {
+                  result(d, current_topic)++;
+                }
+              }
+
+              current_iter++;
+            }
+          }
+        }
+      }
+    });
+  }
+  for (auto &worker : workers) {
+    worker.join();
+  }
+  result.array() /= (max_iter - burn_in);
+  result.array().rowwise() += doc_topic_prior_.array().transpose();
+  result.array().colwise() /= result.array().rowwise().sum();
   return result;
 }

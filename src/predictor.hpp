@@ -16,6 +16,11 @@ struct Predictor {
                            std::size_t burn_in, int random_seed = 42,
                            bool use_cgs_p = true);
 
+  RealMatrix predict_gibbs_batch(std::vector<SparseIntegerMatrix> Xs,
+                                 std::size_t iter, std::size_t burn_in,
+                                 int random_seed = 42, bool use_cgs_p = true,
+                                 size_t n_workers = 1);
+
   const RealVector &doc_topic_prior() const { return doc_topic_prior_; }
 
   inline std::vector<RealMatrix>::const_iterator beta_begin() const {

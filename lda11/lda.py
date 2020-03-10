@@ -256,27 +256,30 @@ class MultipleContextLDA(LDAPredictorMixin):
                         1 / float(self.n_components),
                         100
                     )
-                    if self.is_phi_symmetric:
-                        topic_word_prior_new = np.ones_like(topic_word_prior) * learn_dirichlet_symmetric(
-                            word_topic.transpose().copy(),
-                            topic_word_prior.mean(),
-                            0.1,
-                            1 / float(self.n_components),
-                            100
+                    for topic_word_prior, word_topic, docstate in zip(
+                        self.topic_word_priors, word_topics, docstates
+                    ):
+                        if self.is_phi_symmetric:
+                            topic_word_prior_new = np.ones_like(topic_word_prior) * learn_dirichlet_symmetric(
+                                word_topic.transpose().copy(),
+                                topic_word_prior.mean(),
+                                0.1,
+                                1 / float(self.n_components),
+                                100
+                            )
+                        else:
+                            topic_word_prior_new = learn_dirichlet(
+                                word_topic.transpose().copy(),
+                                topic_word_prior,
+                                0.1,
+                                1 / float(self.n_components),
+                                100
+                            )
+                        topic_word_prior[:] = topic_word_prior_new
+                        self.doc_topic_prior = doc_topic_prior_new
+                        docstate.set_doc_topic_prior(
+                            doc_topic_prior_new
                         )
-                    else:
-                        topic_word_prior_new = learn_dirichlet(
-                            word_topic.transpose().copy(),
-                            topic_word_prior,
-                            0.1,
-                            1 / float(self.n_components),
-                            100
-                        )
-                    topic_word_prior[:] = topic_word_prior_new
-                    self.doc_topic_prior = doc_topic_prior_new
-                    docstate.set_doc_topic_prior(
-                        doc_topic_prior_new
-                    )
 
         predictor = Predictor(self.n_components, self.doc_topic_prior, 42)
 

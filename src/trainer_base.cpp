@@ -105,23 +105,29 @@ void LDATrainerBase::iterate_gibbs(Eigen::Ref<RealVector> topic_word_prior,
       topic_counts(ws.topic_id)++;
     }
   } else {
+    /*
     for (auto &child : children) {
       child->sync_topic(word_topic, doc_topic, topic_counts);
     }
     for (auto &child : children) {
       child->decr_count(word_topic, doc_topic, topic_counts);
     }
+    */
     std::vector<std::thread> workers;
     for (auto &child : children) {
-      workers.emplace_back(
-          [&child, &topic_word_prior] { child->do_work(topic_word_prior); });
+      workers.emplace_back([this, &child, &word_topic, &doc_topic,
+                            &topic_counts, &topic_word_prior] {
+        child->do_work(word_topic, doc_topic, topic_counts, topic_word_prior);
+      });
     }
     for (auto &th : workers) {
       th.join();
     }
+    /*
     for (auto &child : children) {
       child->add_count(word_topic, doc_topic, topic_counts);
     }
+    */
   }
 }
 

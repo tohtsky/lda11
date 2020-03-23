@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+
 Predictor::Predictor(size_t n_topics, const RealVector &doc_topic_prior,
                      int random_seed)
     : betas_(), n_topics_(n_topics), doc_topic_prior_(doc_topic_prior),
@@ -152,7 +153,7 @@ RealMatrix Predictor::predict_gibbs_batch(std::vector<SparseIntegerMatrix> Xs,
       throw std::invalid_argument("non-uniform shape for Xs.");
     }
   }
-  for (int i = 0; i < Xs.size(); i++) {
+  for (size_t i = 0; i < Xs.size(); i++) {
     Xs[i].makeCompressed();
   }
   RealMatrix result(shape, n_topics_);

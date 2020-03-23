@@ -1,15 +1,13 @@
-# This example requires nltk and scikit-leran.
-from collections import OrderedDict
-from copy import deepcopy
-import numpy as np
+# This example requires scikit-leran.
 from time import time
 
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+import numpy as np
+from scipy import sparse as sps
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
-from scipy import sparse as sps
-
 from sklearn.decomposition import LatentDirichletAllocation as LDA_vb
+
 from lda11 import LDA as LDA_cgs_p
 from lda11.util import rowwise_train_test_split
 

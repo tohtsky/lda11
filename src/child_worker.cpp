@@ -2,6 +2,7 @@
 #include "trainer_base.hpp"
 #include "util.hpp"
 #include <cstddef>
+#include <mutex>
 
 LDATrainerBase::ChildWorker::ChildWorker(LDATrainerBase *parent,
                                          size_t n_topics, int random_seed)
@@ -42,8 +43,11 @@ void LDATrainerBase::ChildWorker::decr_count(
     Eigen::Ref<IntegerMatrix> word_topic_global,
     Eigen::Ref<IntegerMatrix> doc_topic_global,
     Eigen::Ref<IntegerVector> topic_counts) {
-  word_topic_global -= word_topic_local;
-  topic_counts -= topic_counts_local;
+  {
+    std::lock_guard<std::mutex> lock(parent_->mutex_);
+    word_topic_global -= word_topic_local;
+    topic_counts -= topic_counts_local;
+  }
   for (auto &ws : word_states_local) {
     size_t dix_global = global_indices[ws.doc_id];
     doc_topic_global(dix_global, ws.topic_id)--;
@@ -54,8 +58,11 @@ void LDATrainerBase::ChildWorker::add_count(
     Eigen::Ref<IntegerMatrix> word_topic_global,
     Eigen::Ref<IntegerMatrix> doc_topic_global,
     Eigen::Ref<IntegerVector> topic_counts) {
-  word_topic_global += word_topic_local;
-  topic_counts += topic_counts_local;
+  {
+    std::lock_guard<std::mutex> lock(parent_->mutex_);
+    word_topic_global += word_topic_local;
+    topic_counts += topic_counts_local;
+  }
   for (auto &ws : word_states_local) {
     size_t dix_global = global_indices[ws.doc_id];
     doc_topic_global(dix_global, ws.topic_id)++;
@@ -76,7 +83,11 @@ void LDATrainerBase::ChildWorker::sync_topic(
 }
 
 void LDATrainerBase::ChildWorker::do_work(
+    Eigen::Ref<IntegerMatrix> word_topic, Eigen::Ref<IntegerMatrix> doc_topic,
+    Eigen::Ref<IntegerVector> topic_counts,
     const Eigen::Ref<RealVector> &topic_word_prior) {
+  this->sync_topic(word_topic, doc_topic, topic_counts);
+  this->decr_count(word_topic, doc_topic, topic_counts);
   Real eta_sum = topic_word_prior.sum();
   RealVector p_(n_topics_);
 
@@ -99,6 +110,7 @@ void LDATrainerBase::ChildWorker::do_work(
     word_topic_local(ws.word_id, ws.topic_id)++;
     topic_counts_local(ws.topic_id)++;
   }
+  this->add_count(word_topic, doc_topic, topic_counts);
 }
 
 RealMatrix LDATrainerBase::ChildWorker::obtain_phi(

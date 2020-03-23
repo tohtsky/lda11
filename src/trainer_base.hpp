@@ -2,6 +2,7 @@
 #include "defs.hpp"
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 
 struct LDATrainerBase {
@@ -43,7 +44,10 @@ struct LDATrainerBase {
                    Eigen::Ref<IntegerMatrix> doc_topic_global,
                    Eigen::Ref<IntegerVector> topic_counts);
 
-    void do_work(const Eigen::Ref<RealVector> &topic_word_prior);
+    void do_work(Eigen::Ref<IntegerMatrix> word_topic,
+                 Eigen::Ref<IntegerMatrix> doc_topic,
+                 Eigen::Ref<IntegerVector> topic_counts,
+                 const Eigen::Ref<RealVector> &topic_word_prior);
     RealMatrix obtain_phi(const Eigen::Ref<RealVector> &topic_word_prior);
     LDATrainerBase *parent_;
     size_t n_topics_;
@@ -65,4 +69,5 @@ protected:
 
   std::mt19937 random_state_;
   UrandDevice urand_;
+  std::mutex mutex_;
 };

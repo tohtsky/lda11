@@ -4,12 +4,14 @@
 #include "state.hpp"
 #include "trainer.hpp"
 
+#include "unsupported/Eigen/src/SpecialFunctions/SpecialFunctionsImpl.h"
 #include "util.hpp"
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <future>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -202,17 +204,41 @@ Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
 
 Real log_likelihood_doc_topic(const Eigen::Ref<RealVector> &doc_topic_prior,
                               const Eigen::Ref<IntegerMatrix> &doc_topic,
-                              const Eigen::Ref<IntegerVector> &doc_length) {
+                              const Eigen::Ref<IntegerVector> &doc_length,
+                              size_t n_workers) {
   size_t n_doc = doc_topic.rows();
   Real ll = n_doc * (std::lgamma(doc_topic_prior.sum()) -
                      doc_topic_prior.array().lgamma().sum());
   Real doc_topic_sum = doc_topic_prior.array().sum();
-
-  ll += (doc_topic.array().cast<Real>().rowwise() +
-         doc_topic_prior.transpose().array())
-            .lgamma()
-            .sum();
-  ll -= (doc_length.array().cast<Real>() + doc_topic_sum).lgamma().sum();
+  if (n_workers <= 1) {
+    ll += (doc_topic.array().cast<Real>().rowwise() +
+           doc_topic_prior.transpose().array())
+              .lgamma()
+              .sum();
+    ll -= (doc_length.array().cast<Real>() + doc_topic_sum).lgamma().sum();
+  } else {
+    std::vector<std::future<Real>> local_lls;
+    for (size_t worker_index = 0; worker_index < n_workers; worker_index++) {
+      std::future<Real> local_ll = std::async(
+          std::launch::async, [n_workers, worker_index, doc_topic_sum,
+                               &doc_topic, &doc_topic_prior, &doc_length] {
+            size_t n_row = doc_topic.rows();
+            Real result = 0;
+            for (size_t i = worker_index; i < n_row; i += n_workers) {
+              result += (doc_topic.row(i).array().cast<Real>() +
+                         doc_topic_prior.transpose().array())
+                            .lgamma()
+                            .sum();
+              result -= Eigen::numext::lgamma(doc_length(i) + doc_topic_sum);
+            }
+            return result;
+          });
+      local_lls.push_back(std::move(local_ll));
+    }
+    for (size_t worker_index = 0; worker_index < n_workers; worker_index++) {
+      ll += local_lls[worker_index].get();
+    }
+  }
 
   return ll;
 }

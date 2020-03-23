@@ -212,7 +212,7 @@ class MultipleContextLDA(LDAPredictorMixin):
         doc_length = doc_topic.sum(axis=1).astype(IntegerType)
 
         ll = log_likelihood_doc_topic(
-            self.doc_topic_prior, doc_topic, doc_length
+            self.doc_topic_prior, doc_topic, doc_length, 1
         )
         for topic_word_prior, word_topic, docstate in zip(
             self.topic_word_priors, word_topics, docstates
@@ -235,7 +235,7 @@ class MultipleContextLDA(LDAPredictorMixin):
                     )
                 if (i + 1) % ll_freq == 0:
                     ll = log_likelihood_doc_topic(
-                        self.doc_topic_prior, doc_topic, doc_length
+                        self.doc_topic_prior, doc_topic, doc_length, 1
                     )
 
                     for topic_word_prior, word_topic, docstate in zip(

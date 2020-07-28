@@ -1,7 +1,7 @@
 #include "defs.hpp"
 #include "predictor.hpp"
 #include "pybind11/attr.h"
-#include "state.hpp"
+#include "labelled_lda.hpp"
 #include "trainer.hpp"
 
 #include "unsupported/Eigen/src/SpecialFunctions/SpecialFunctionsImpl.h"
@@ -144,6 +144,7 @@ Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
     throw std::invalid_argument("count array and alpha have different sizes.");
   }
   Real alpha_current(alpha_start);
+
   Real numerator;
 
   vector<Real> doc_length;
@@ -228,6 +229,16 @@ PYBIND11_MODULE(_lda, m) {
       .def("iterate_gibbs", &LDATrainer::iterate_gibbs)
       .def("obtain_phi", &LDATrainer::obtain_phi)
       .def("log_likelihood", &LDATrainer::log_likelihood);
+
+  py::class_<LabelledLDATrainer>(m, "LabelledLDATrainer")
+      .def(py::init<Real, Real, const SparseIntegerMatrix &, Eigen::Ref<IntegerVector>,
+                    Eigen::Ref<IndexVector>, Eigen::Ref<IndexVector>,
+                    size_t, int, size_t>())
+      .def("initialize", &LabelledLDATrainer::initialize_count)
+      .def("iterate_gibbs", &LabelledLDATrainer::iterate_gibbs)
+      .def("obtain_phi", &LabelledLDATrainer::obtain_phi)
+      .def("log_likelihood", &LabelledLDATrainer::log_likelihood);
+
 
   m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
   m.def("learn_dirichlet", &learn_dirichlet);

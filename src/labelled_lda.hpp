@@ -8,14 +8,15 @@
 #include "trainer_base.hpp"
 
 struct LabelledLDATrainer : LDATrainerBase {
-  LabelledLDATrainer(Real alpha, Real epsilon, const IntegerMatrix &Labels,
+  LabelledLDATrainer(Real alpha, Real epsilon, const SparseIntegerMatrix &labels,
                      Eigen::Ref<IntegerVector> counts,
                      Eigen::Ref<IndexVector> dixs, Eigen::Ref<IndexVector> wixs,
-                     size_t n_topics, int random_seed = 42);
+                     size_t n_topics, int random_seed = 42, size_t n_workers=1);
 
-  virtual const RealVector & obtain_doc_topic_prior(size_t doc_index) override;
+  virtual Eigen::Ref<RealVector> obtain_doc_topic_prior(size_t doc_index) override;
 
 private:
   Real alpha_, epsilon_;
-  IntegerMatrix labels_;
+  SparseIntegerMatrix labels_;
+  Eigen::Matrix<Real, -1, -1, Eigen::ColMajor> alpha_hat;
 };

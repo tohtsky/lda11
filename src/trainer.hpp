@@ -10,20 +10,7 @@ struct LDATrainer : LDATrainerBase {
 
   void set_doc_topic_prior(const Eigen::Ref<RealVector> &new_dtp);
 
-private:
-  struct ChildWorker {
-    ChildWorker(LDATrainer *parent, int random_seed);
-    void set_word_topic(Eigen::Ref<IntegerMatrix> word_topic_global);
-
-    std::vector<size_t> original_incides;
-    IntegerMatrix doc_topic;
-    IntegerMatrix word_topic_local;
-
-    int random_seed;
-  };
-
-  virtual const RealVector & obtain_doc_topic_prior(size_t doc_index) override;
-  std::vector<std::unique_ptr<ChildWorker>> children;
+ virtual Eigen::Ref<RealVector> obtain_doc_topic_prior(size_t doc_index) override;
 
 private:
   RealVector doc_topic_prior_;

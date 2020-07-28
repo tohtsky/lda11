@@ -8,7 +8,7 @@ LDATrainer::LDATrainer(const RealVector &doc_topic_prior,
     : LDATrainerBase(counts, dixs, wixs, n_topics, random_seed, n_workers),
       doc_topic_prior_(doc_topic_prior) {}
 
-const RealVector & LDATrainer::obtain_doc_topic_prior(std::size_t doc_index) {
+Eigen::Ref<RealVector> LDATrainer::obtain_doc_topic_prior(std::size_t doc_index) {
   return doc_topic_prior_;
 }
 

@@ -2,7 +2,6 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
-from distutils.command.clean import clean as Clean
 import os
 __version__ = '0.1.4.3'
 install_requires = ['pybind11>=2.4', 'numpy >= 1.11', 'tqdm', 'scipy>=1.0.0']
@@ -58,7 +57,8 @@ ext_modules = [
     Extension(
         'lda11._lda',
         ['src/wrapper.cpp', 'src/predictor.cpp',
-            'src/trainer_base.cpp', 'src/trainer.cpp', 'src/child_worker.cpp'],
+            'src/trainer_base.cpp', 'src/trainer.cpp', 'src/child_worker.cpp',
+            'src/labelled_lda.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),

@@ -72,49 +72,47 @@ class LDAPredictorMixin:
     are needed
     """
 
-    def transform(
-        self, *Xs,
-        n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10
-    ):
-
+    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10, gibbs_burn_in=10, use_cgs_p=True, n_workers=1):
         n_domains = len(Xs)
-        if len(self.components_) != n_domains:
-            raise ValueError(
-                f"Got {n_domains} input, while training was {len(self.components_)} domaints.")
-        shapes = set({X.shape[0] for X in Xs if X is not None})
-        assert(len(shapes) == 1)
+        shapes = set({X.shape[0] for X in Xs})
+        if (len(shapes) != 1):
+            raise ValueError("Got different shape for Xs.")
+
         for shape in shapes:
             break
 
-        Xs_completed = []
+        Xs_csr = []
         for i, X in enumerate(Xs):
-            if X is not None:
-                Xs_completed.append(X)
-
-            # X is None
-            X_zero = sps.csr_matrix((shape, self.components_[i].shape[1]))
-            Xs_completed.append(X_zero)
-        Xs = Xs_completed
-
-        results = np.zeros((shape, self.n_components), dtype=RealType)
-        for i in range(shape):
-            counts = []
-            wixs = []
-            for n in range(n_domains):
-                count, wix = bow_row_to_counts(Xs[n], i)
-                counts.append(count)
-                wixs.append(wix)
-            if mode == "gibbs":
-                m = self.predictor.predict_gibbs(
-                    wixs, counts, n_iter, random_seed
+            if X is None:
+                Xs_csr.append(
+                    sps.csr_matrix(([], ([], [])), shape=(
+                        shape, self.topic_word_priors[i].shape[0]))
                 )
-                m = m + self.doc_topic_prior
-                results[i] = m / m.sum()
             else:
+                Xs_csr.append(to_sparse(X))
+
+        if mode == 'gibbs':
+            return self.predictor.predict_gibbs_batch(
+                Xs_csr, n_iter, gibbs_burn_in, random_seed, use_cgs_p, n_workers
+            )
+        else:
+            results = np.zeros((shape, self.n_components), dtype=RealType)
+            for i in range(shape):
+                counts = []
+                wixs = []
+                for n in range(n_domains):
+                    count, wix = bow_row_to_counts(Xs[n], i)
+                    counts.append(count)
+                    wixs.append(wix)
+
                 results[i] = self.predictor.predict_mf(
                     wixs, counts, n_iter, mf_tolerance
                 )
-        return results
+            return results
+
+    @property
+    def phis(self):
+        return self.predictor.phis
 
 
 class MultipleContextLDA(LDAPredictorMixin):
@@ -300,48 +298,6 @@ class MultipleContextLDA(LDAPredictorMixin):
         self.predictor = predictor
 
         return doc_topic
-
-    @property
-    def phis(self):
-        return self.predictor.phis
-
-    def transform(self, *Xs, n_iter=100, random_seed=42, mode="gibbs", mf_tolerance=1e-10, gibbs_burn_in=10, use_cgs_p=True, n_workers=1):
-        n_domains = len(Xs)
-        shapes = set({X.shape[0] for X in Xs})
-        if (len(shapes) != 1):
-            raise ValueError("Got different shape for Xs.")
-
-        for shape in shapes:
-            break
-
-        Xs_csr = []
-        for i, X in enumerate(Xs):
-            if X is None:
-                Xs_csr.append(
-                    sps.csr_matrix(([], ([], [])), shape=(
-                        shape, self.topic_word_priors[i].shape[0]))
-                )
-            else:
-                Xs_csr.append(to_sparse(X))
-
-        if mode == 'gibbs':
-            return self.predictor.predict_gibbs_batch(
-                Xs_csr, n_iter, gibbs_burn_in, random_seed, use_cgs_p, n_workers
-            )
-        else:
-            results = np.zeros((shape, self.n_components), dtype=RealType)
-            for i in range(shape):
-                counts = []
-                wixs = []
-                for n in range(n_domains):
-                    count, wix = bow_row_to_counts(Xs[n], i)
-                    counts.append(count)
-                    wixs.append(wix)
-
-                results[i] = self.predictor.predict_mf(
-                    wixs, counts, n_iter, mf_tolerance
-                )
-            return results
 
 
 class LDA(MultipleContextLDA):

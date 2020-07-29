@@ -3,8 +3,8 @@ from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
 import os
-__version__ = '0.1.4.3'
-install_requires = ['pybind11>=2.4', 'numpy >= 1.11', 'tqdm', 'scipy>=1.0.0']
+__version__ = '0.2.0.0'
+install_requires = ['pybind11>=2.5', 'numpy >= 1.11', 'tqdm', 'scipy>=1.0.0']
 
 eigen_include_dir = os.environ.get('EIGEN3_INCLUDE_DIR', None)
 if eigen_include_dir is None:

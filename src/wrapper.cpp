@@ -1,7 +1,7 @@
 #include "defs.hpp"
+#include "labelled_lda.hpp"
 #include "predictor.hpp"
 #include "pybind11/attr.h"
-#include "labelled_lda.hpp"
 #include "trainer.hpp"
 
 #include "unsupported/Eigen/src/SpecialFunctions/SpecialFunctionsImpl.h"
@@ -231,14 +231,13 @@ PYBIND11_MODULE(_lda, m) {
       .def("log_likelihood", &LDATrainer::log_likelihood);
 
   py::class_<LabelledLDATrainer>(m, "LabelledLDATrainer")
-      .def(py::init<Real, Real, const SparseIntegerMatrix &, Eigen::Ref<IntegerVector>,
-                    Eigen::Ref<IndexVector>, Eigen::Ref<IndexVector>,
-                    size_t, int, size_t>())
+      .def(py::init<Real, Real, const SparseIntegerMatrix &,
+                    Eigen::Ref<IntegerVector>, Eigen::Ref<IndexVector>,
+                    Eigen::Ref<IndexVector>, size_t, int, size_t>())
       .def("initialize", &LabelledLDATrainer::initialize_count)
       .def("iterate_gibbs", &LabelledLDATrainer::iterate_gibbs)
       .def("obtain_phi", &LabelledLDATrainer::obtain_phi)
       .def("log_likelihood", &LabelledLDATrainer::log_likelihood);
-
 
   m.def("log_likelihood_doc_topic", &log_likelihood_doc_topic);
   m.def("learn_dirichlet", &learn_dirichlet);
@@ -253,21 +252,22 @@ PYBIND11_MODULE(_lda, m) {
       .def("predict_gibbs_batch", &Predictor::predict_gibbs_batch)
       .def("predict_mf", &Predictor::predict_mf)
       .def_readonly("phis", &Predictor::betas_)
-      .def("__getstate__",
-           [](const Predictor &p) {
-             std::vector<RealMatrix> betas;
-             for (auto b = p.beta_begin(); b != p.beta_end(); b++) {
-               betas.push_back(*b);
-             }
-             return py::make_tuple(p.n_topics(), p.doc_topic_prior(), betas);
-           })
-      .def("__setstate__", [](Predictor &p, py::tuple t) {
-        if (t.size() != 3)
-          throw std::runtime_error("Invalid state!");
-        new (&p) Predictor(t[0].cast<size_t>(), t[1].cast<RealVector>());
-        py::list betas_ = t[2].cast<py::list>();
-        for (auto item : betas_) {
-          p.add_beta(item.cast<RealMatrix>());
-        }
-      });
+      .def(py::pickle(
+          [](const Predictor &p) {
+            std::vector<RealMatrix> betas;
+            for (auto b = p.beta_begin(); b != p.beta_end(); b++) {
+              betas.push_back(*b);
+            }
+            return py::make_tuple(p.n_topics(), p.doc_topic_prior(), betas);
+          },
+          [](py::tuple t) {
+            if (t.size() != 3)
+              throw std::runtime_error("Invalid state!");
+            Predictor p(t[0].cast<size_t>(), t[1].cast<RealVector>());
+            py::list betas_ = t[2].cast<py::list>();
+            for (auto item : betas_) {
+              p.add_beta(item.cast<RealMatrix>());
+            }
+            return p;
+          }));
 }

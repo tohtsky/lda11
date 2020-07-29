@@ -12,6 +12,6 @@ pubind11/
 .eggs/
 var/
 dist/
-CMakeLists.txt
 compile_commands.json
 .clangd/
+**.ipynb_checkpoints/**

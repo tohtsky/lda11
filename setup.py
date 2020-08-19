@@ -3,7 +3,7 @@ from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
 import os
-__version__ = '0.2.0.0'
+__version__ = '0.2.0.1'
 install_requires = ['pybind11>=2.5', 'numpy >= 1.11', 'tqdm', 'scipy>=1.0.0']
 
 eigen_include_dir = os.environ.get('EIGEN3_INCLUDE_DIR', None)
@@ -12,8 +12,8 @@ if eigen_include_dir is None:
 
 
 class get_eigen_include(object):
-    EIGEN3_URL = 'http://bitbucket.org/eigen/eigen/get/3.3.7.zip'
-    EIGEN3_DIRNAME = 'eigen-eigen-323c052e1731'
+    EIGEN3_URL = 'https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.zip'
+    EIGEN3_DIRNAME = 'eigen-3.3.7'
 
     def __str__(self):
         if eigen_include_dir is not None:

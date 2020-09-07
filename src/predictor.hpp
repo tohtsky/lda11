@@ -1,5 +1,6 @@
 #pragma once
 #include "defs.hpp"
+#include <tuple>
 
 struct Predictor {
   Predictor(size_t n_topics, const RealVector &doc_topic_prior,
@@ -11,10 +12,17 @@ struct Predictor {
                         std::vector<IntegerVector> counts, std::size_t iter,
                         Real delta);
 
-  RealVector predict_gibbs(std::vector<IntegerVector> nonzeros,
-                           std::vector<IntegerVector> counts, std::size_t iter,
-                           std::size_t burn_in, int random_seed = 42,
-                           bool use_cgs_p = true);
+  std::pair<RealVector, std::vector<std::map<size_t, IntegerVector>>>
+  predict_gibbs_with_word_assignment(std::vector<IntegerVector> nonzeros,
+                                     std::vector<IntegerVector> counts,
+                                     std::size_t iter, std::size_t burn_in,
+                                     int random_seed = 42,
+                                     bool use_cgs_p = true);
+
+  RealVector predict_gibbs(const std::vector<IntegerVector> &nonzeros,
+                           const std::vector<IntegerVector> &counts,
+                           std::size_t iter, std::size_t burn_in,
+                           int random_seed = 42, bool use_cgs_p = true);
 
   RealMatrix predict_gibbs_batch(std::vector<SparseIntegerMatrix> Xs,
                                  std::size_t iter, std::size_t burn_in,
@@ -36,6 +44,11 @@ struct Predictor {
   std::vector<RealMatrix> betas_;
 
 private:
+  RealVector predict_gibbs_write_assignment(
+      const std::vector<IntegerVector> &nonzeros,
+      const std::vector<IntegerVector> &counts, std::size_t iter,
+      std::size_t burn_in, int random_seed = 42, bool use_cgs_p = true,
+      std::vector<std::map<size_t, IntegerVector>> *cnt_target = nullptr);
   const std::size_t n_topics_;
   RealVector doc_topic_prior_;
   std::size_t n_domains_;

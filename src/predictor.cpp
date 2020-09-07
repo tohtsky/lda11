@@ -61,10 +61,12 @@ RealVector Predictor::predict_mf(std::vector<IntegerVector> nonzeros,
   return theta;
 }
 
-RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
-                                    std::vector<IntegerVector> counts,
-                                    std::size_t max_iter, std::size_t burn_in,
-                                    int random_seed, bool use_cgs_p) {
+RealVector Predictor::predict_gibbs_write_assignment(
+    const std::vector<IntegerVector> &nonzeros,
+    const std::vector<IntegerVector> &counts, std::size_t max_iter,
+    std::size_t burn_in, int random_seed, bool use_cgs_p,
+    std::vector<std::map<size_t, IntegerVector>> *cnt_target) {
+  bool write_to_target = !(cnt_target == nullptr);
   if (burn_in >= max_iter) {
     throw std::invalid_argument("max_iter must be larger than burn_in.");
   }
@@ -79,7 +81,7 @@ RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
   RealVector p_temp(n_topics_);
   std::vector<size_t> topics;
   for (size_t n = 0; n < n_domains_; n++) {
-    IntegerVector &count = counts[n];
+    const IntegerVector &count = counts[n];
     size_t n_unique_word = nonzeros[n].rows();
     for (size_t j = 0; j < n_unique_word; j++) {
       for (int k = 0; k < count(j); k++) {
@@ -114,6 +116,9 @@ RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
           current_state(current_topic)++;
           topics[current_iter] = current_topic;
           if (iter_ >= burn_in) {
+            if (write_to_target) {
+              (*cnt_target)[n].at(wid)(current_topic)++;
+            }
             if (use_cgs_p) {
               result += p_temp;
             } else {
@@ -130,6 +135,33 @@ RealVector Predictor::predict_gibbs(std::vector<IntegerVector> nonzeros,
   result += doc_topic_prior_;
   result.array() /= result.array().sum();
   return result;
+}
+
+std::pair<RealVector, std::vector<std::map<size_t, IntegerVector>>>
+Predictor::predict_gibbs_with_word_assignment(
+    std::vector<IntegerVector> nonzeros, std::vector<IntegerVector> counts,
+    std::size_t iter, std::size_t burn_in, int random_seed, bool use_cgs_p) {
+  std::pair<RealVector, std::vector<std::map<size_t, IntegerVector>>> result;
+  for (size_t n = 0; n < n_domains_; n++) {
+    size_t n_unique_words = nonzeros[n].rows();
+    result.second.emplace_back();
+    for (size_t j = 0; j < n_unique_words; j++) {
+      size_t wid = nonzeros[n](j);
+      result.second[n][wid] = IntegerVector::Zero(n_topics_);
+    }
+  }
+  result.first = predict_gibbs_write_assignment(
+      nonzeros, counts, iter, burn_in, random_seed, use_cgs_p, &result.second);
+  return result;
+}
+
+RealVector Predictor::predict_gibbs(const std::vector<IntegerVector> &nonzeros,
+                                    const std::vector<IntegerVector> &counts,
+                                    std::size_t max_iter, std::size_t burn_in,
+                                    int random_seed, bool use_cgs_p) {
+
+  return predict_gibbs_write_assignment(nonzeros, counts, max_iter, burn_in,
+                                        random_seed, use_cgs_p, nullptr);
 }
 
 RealMatrix Predictor::predict_gibbs_batch(std::vector<SparseIntegerMatrix> Xs,

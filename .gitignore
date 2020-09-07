@@ -1,4 +1,5 @@
-eigen-eigen-323c052e1731/**
+**.ipynb_checkpoints**
+eigen-3.3.7/
 build/*
 **__pycache__**
 tmp/**

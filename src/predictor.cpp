@@ -16,10 +16,98 @@ void Predictor::add_beta(const RealMatrix &beta) {
   betas_.push_back(beta);
   n_domains_++;
 }
+RealMatrix Predictor::predict_mf_batch(std::vector<SparseIntegerMatrix> Xs,
+                                       std::size_t iter, Real delta,
+                                       size_t n_workers) const {
+  if (n_workers == 0) {
+    throw std::invalid_argument("n_workes must be greater than 0.");
+  }
+  size_t n_domains = Xs.size();
+  if (n_domains == 0) {
+    throw std::invalid_argument("No input.");
+  }
+  int shape = Xs[0].rows();
+  for (size_t i = 1; i < n_domains_; i++) {
+    if (shape != Xs[i].rows()) {
+      throw std::invalid_argument("non-uniform shape for Xs.");
+    }
+  }
+  for (size_t i = 0; i < Xs.size(); i++) {
+    Xs[i].makeCompressed();
+  }
+  RealMatrix result(shape, this->n_topics_);
+  result.array() = 0;
+  std::atomic<int> current_cursor(0);
+  std::vector<std::thread> workers;
+  for (size_t worker_index = 0; worker_index < n_workers; worker_index++) {
+    workers.emplace_back([this, &current_cursor, shape, &result, iter, delta,
+                          n_domains, &Xs]() {
+      std::vector<std::vector<size_t>> indices(n_domains);
+      std::vector<std::vector<size_t>> counts(n_domains);
+      while (true) {
+        int cursor = current_cursor++;
+        if (cursor >= shape) {
+          break;
+        }
+        size_t dim_buffer = 0;
+        for (size_t n = 0; n < n_domains; n++) {
+          indices[n].clear();
+          counts[n].clear();
+          for (SparseIntegerMatrix::InnerIterator it(Xs[n], cursor); it; ++it) {
+            auto cnt = static_cast<size_t>(it.value());
+            indices[n].push_back(static_cast<size_t>(it.col()));
+            counts[n].push_back(cnt);
+            dim_buffer += cnt;
+          }
+        }
+        if (dim_buffer == 0) {
+          result.row(cursor) =
+              (doc_topic_prior_ / doc_topic_prior_.sum()).transpose();
+          continue;
+        }
+        RealMatrix current_prob(dim_buffer, n_topics_);
+        current_prob.array() = 0;
+        RealMatrix new_prob(dim_buffer, n_topics_);
+        RealMatrix beta_rel(dim_buffer, n_topics_);
 
+        size_t mf_iter = 0;
+        for (size_t n = 0; n < n_domains; n++) {
+          size_t n_unique_words = indices[n].size();
+          for (size_t j = 0; j < n_unique_words; j++) {
+            size_t wid = indices[n][j];
+            size_t count = counts[n][j];
+            for (size_t k = 0; k < count; k++) {
+              beta_rel.row(mf_iter) = betas_[n].row(wid);
+              mf_iter++;
+            }
+          }
+        }
+
+        for (size_t i = 0; i <= iter; i++) {
+          new_prob = -current_prob;
+          new_prob.rowwise() += current_prob.colwise().sum();
+          new_prob.rowwise() += doc_topic_prior_.transpose();
+          new_prob.array() = new_prob.array() * beta_rel.array();
+          new_prob.array().colwise() /= new_prob.array().rowwise().sum();
+          double diff = (new_prob - current_prob).array().abs().sum();
+          current_prob = new_prob;
+          if (diff < delta)
+            break;
+        }
+        RealVector theta = current_prob.array().colwise().sum().transpose();
+        theta /= theta.sum();
+        result.row(cursor) = theta.transpose();
+      }
+    });
+  }
+  for (auto &worker : workers) {
+    worker.join();
+  }
+  return result;
+}
 RealVector Predictor::predict_mf(std::vector<IntegerVector> nonzeros,
                                  std::vector<IntegerVector> counts,
-                                 std::size_t iter, Real delta) {
+                                 std::size_t iter, Real delta) const {
   size_t dim_buffer = 0;
   for (size_t n = 0; n < n_domains_; n++) {
     dim_buffer += counts[n].sum();

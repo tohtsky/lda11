@@ -86,13 +86,10 @@ class LDAPredictorMixin:
         use_cgs_p=True,
         n_workers=1
     ):
-        n_domains = len(Xs)
         shapes = set({X.shape[0] for X in Xs})
         if len(shapes) != 1:
             raise ValueError("Got different shape for Xs.")
-
-        for shape in shapes:
-            break
+        shape = list(shapes)[0]
 
         Xs_csr = []
         for i, X in enumerate(Xs):
@@ -111,19 +108,9 @@ class LDAPredictorMixin:
                 Xs_csr, n_iter, gibbs_burn_in, random_seed, use_cgs_p, n_workers
             )
         else:
-            results = np.zeros((shape, self.n_components), dtype=RealType)
-            for i in range(shape):
-                counts = []
-                wixs = []
-                for n in range(n_domains):
-                    count, wix = bow_row_to_counts(Xs[n], i)
-                    counts.append(count)
-                    wixs.append(wix)
-
-                results[i] = self.predictor.predict_mf(
-                    wixs, counts, n_iter, mf_tolerance
-                )
-            return results
+            return self.predictor.predict_mf_batch(
+                Xs_csr, n_iter, mf_tolerance, n_workers
+            )
 
     def word_topic_assignment(
         self, *Xs, n_iter=100, random_seed=42, gibbs_burn_in=10, use_cgs_p=True

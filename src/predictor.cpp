@@ -1,6 +1,7 @@
 #include "predictor.hpp"
 #include "defs.hpp"
 #include "util.hpp"
+#include <atomic>
 #include <cstddef>
 #include <iostream>
 #include <sstream>
@@ -37,7 +38,7 @@ RealMatrix Predictor::predict_mf_batch(std::vector<SparseIntegerMatrix> Xs,
   }
   RealMatrix result(shape, this->n_topics_);
   result.array() = 0;
-  std::atomic<int> current_cursor(0);
+  std::atomic<int> current_cursor(static_cast<int>(0));
   std::vector<std::thread> workers;
   for (size_t worker_index = 0; worker_index < n_workers; worker_index++) {
     workers.emplace_back([this, &current_cursor, shape, &result, iter, delta,

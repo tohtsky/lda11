@@ -16,3 +16,4 @@ dist/
 compile_commands.json
 .clangd/
 **.ipynb_checkpoints/**
+.cache/clangd

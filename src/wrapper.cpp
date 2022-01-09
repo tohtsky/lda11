@@ -145,8 +145,6 @@ Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
   }
   Real alpha_current(alpha_start);
 
-  Real numerator;
-
   vector<Real> doc_length;
   vector<Real> doc_length_freq;
 
@@ -183,7 +181,6 @@ Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
   }
   for (size_t it = 0; it < iteration; it++) {
     Real alpha_sum = n_topic * alpha_current;
-    numerator = 0;
     Real denominator =
         ((vector_to_eigen(doc_length).array() + alpha_sum).digamma() -
          digamma(alpha_sum))

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12)
-set(CMAKE_EXPORT_COMPILE_COMMANDS, True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(lda11)
 
 add_subdirectory(pybind11)

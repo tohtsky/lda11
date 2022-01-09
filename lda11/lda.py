@@ -1,16 +1,18 @@
-import numpy as np
-from numbers import Number
 from gc import collect
+from numbers import Number
+
+import numpy as np
+from scipy import sparse as sps
+from scipy.special import digamma
+from tqdm import tqdm
+
 from ._lda import (
     LDATrainer,
-    log_likelihood_doc_topic,
     Predictor,
     learn_dirichlet,
     learn_dirichlet_symmetric,
+    log_likelihood_doc_topic,
 )
-from tqdm import tqdm
-from scipy import sparse as sps
-from scipy.special import digamma
 
 RealType = np.float64
 IntegerType = np.int32

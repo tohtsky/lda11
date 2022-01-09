@@ -1,3 +1,4 @@
+.python-version
 **.ipynb_checkpoints**
 eigen-3.3.7/
 build/*
@@ -9,7 +10,6 @@ lda11.egg-info
 .vscode/*
 *.so
 test/*
-pubind11/
 .eggs/
 var/
 dist/

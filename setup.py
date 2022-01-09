@@ -1,8 +1,9 @@
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import sys
-import setuptools
 import os
+import sys
+
+import setuptools
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
 __version__ = "0.2.2.0"
 install_requires = ["pybind11>=2.5", "numpy >= 1.11", "tqdm", "scipy>=1.0.0"]
@@ -27,8 +28,9 @@ class get_eigen_include(object):
             return target_dir
 
         download_target_dir = os.path.join(basedir, "eigen3.zip")
-        import requests
         import zipfile
+
+        import requests
 
         response = requests.get(self.EIGEN3_URL, stream=True)
         with open(download_target_dir, "wb") as ofs:
@@ -45,7 +47,7 @@ class get_pybind_include(object):
     """Helper class to determine the pybind11 include path
     The purpose of this class is to postpone importing pybind11
     until it is actually installed, so that the ``get_include()``
-    method can be invoked. """
+    method can be invoked."""
 
     def __init__(self, user=False):
         self.user = user

@@ -21,5 +21,3 @@ type
 ```
 EIGEN3_INCLUDE_DIR=/path/to/eigen pip install git+https://github.com/tohtsky/lda11
 ```
-
-

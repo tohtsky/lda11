@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Dict, List
 
 import setuptools
 from setuptools import Extension, setup
@@ -117,7 +118,7 @@ class BuildExt(build_ext):
         "msvc": ["/EHsc"],
         "unix": [],
     }
-    l_opts = {
+    l_opts: Dict[str, List[str]] = {
         "msvc": [],
         "unix": [],
     }

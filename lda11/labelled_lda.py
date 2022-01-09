@@ -3,11 +3,11 @@ from scipy import sparse as sps
 from tqdm import tqdm
 
 from ._lda import LabelledLDATrainer
+from ._lda import Predictor as CorePredictor
 from .lda import (
     IndexType,
     IntegerType,
     LDAPredictorMixin,
-    Predictor,
     RealType,
     check_array,
     number_to_array,
@@ -48,7 +48,7 @@ class LabelledLDA(LDAPredictorMixin):
         result /= result.sum(axis=1)[:, np.newaxis]
         return result
 
-    def _fit(self, X, Y, ll_freq=10):
+    def _fit(self, X, Y, ll_freq: int = 10):
         if not sps.issparse(Y):
             Y = sps.csr_matrix(Y).astype(IntegerType)
         else:
@@ -92,7 +92,7 @@ class LabelledLDA(LDAPredictorMixin):
         doc_topic_prior = self.alpha * np.ones(self.n_components, dtype=RealType)
 
         self.components_ = word_topic.transpose()
-        predictor = Predictor(self.n_components, doc_topic_prior, 42)
+        predictor = CorePredictor(self.n_components, doc_topic_prior, 42)
         if self.use_cgs_p:
             phi = docstate.obtain_phi(
                 self.topic_word_prior, doc_topic, word_topic, topic_counts
@@ -108,4 +108,5 @@ class LabelledLDA(LDAPredictorMixin):
 
     @property
     def phi(self):
+        assert self.predictor is not None
         return self.predictor.phis[0]

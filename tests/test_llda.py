@@ -1,9 +1,12 @@
+import pickle
+import sys
+from tempfile import NamedTemporaryFile
 from typing import Tuple
 
 import numpy as np
 import numpy.typing as npt
 
-from lda11 import LabelledLDA
+from lda11 import LabelledLDA, labelled_lda
 
 
 class LabelledLanguage:
@@ -51,15 +54,23 @@ def test_llda() -> None:
         X, Y = language.gen_doc(1000)
 
         llda = LabelledLDA(use_cgs_p=cgs_p, n_workers=n_threads).fit(X, Y)
+        if sys.platform.startswith("linux"):
+            with NamedTemporaryFile() as temp_fs:
+                pickle.dump(llda, temp_fs)
+                temp_fs.seek(0)
+                del llda
+                llda_new: LabelledLDA = pickle.load(temp_fs)
+        else:
+            llda_new = llda
 
         for a_word in A_word_index:
             for b_word in B_word_index:
-                assert llda.phi[a_word, A_index] > llda.phi[b_word, A_index]
-                assert llda.phi[a_word, B_index] < llda.phi[b_word, B_index]
+                assert llda_new.phi[a_word, A_index] > llda_new.phi[b_word, A_index]
+                assert llda_new.phi[a_word, B_index] < llda_new.phi[b_word, B_index]
 
         A_DOC = np.asarray(([0, 10, 0, 10]), dtype=np.int32)
         for mode in ["mf", "gibbs"]:
-            theta = llda.transform(A_DOC, mode=mode, n_workers=n_threads)[0]  # type: ignore
+            theta = llda_new.transform(A_DOC, mode=mode, n_workers=n_threads)[0]  # type: ignore
             if A_index == 1:
                 assert (theta[1] / theta[2]) > 5
             else:

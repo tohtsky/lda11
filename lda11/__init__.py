@@ -1,4 +1,4 @@
-from pkg_resources import DistributionNotFound, get_distribution
+from pkg_resources import DistributionNotFound, get_distribution  # type: ignore
 
 from .labelled_lda import LabelledLDA
 from .lda import LDA, MultilingualLDA

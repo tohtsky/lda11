@@ -12,7 +12,7 @@ def test_lda(docs_gen: Docs) -> None:
         n_iter=50,
         optimize_interval=1,
         optimize_burn_in=25,
-        use_cgs_p=False,
+        use_cgs_p=True,
         n_workers=4,
     )
     lda.fit(X1)

@@ -9,7 +9,9 @@ from .conftest import Docs
 def test_mlda(docs_gen: Docs) -> None:
     (X1, X2), true_theta = docs_gen.gen_doc(1000)
     X2 = sps.lil_matrix(X2)
-    lda = MultilingualLDA(2, n_iter=50, optimize_interval=1, optimize_burn_in=25)
+    lda = MultilingualLDA(
+        2, n_iter=50, optimize_interval=1, optimize_burn_in=25, use_cgs_p=False
+    )
     lda.fit(X1, X2)
     phi1, phi2 = lda.phis
 

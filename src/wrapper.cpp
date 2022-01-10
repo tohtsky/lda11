@@ -249,7 +249,6 @@ PYBIND11_MODULE(_lda, m) {
       .def("predict_gibbs_with_word_assignment",
            &Predictor::predict_gibbs_with_word_assignment)
       .def("predict_gibbs_batch", &Predictor::predict_gibbs_batch)
-      .def("predict_mf", &Predictor::predict_mf)
       .def("predict_mf_batch", &Predictor::predict_mf_batch)
       .def_readonly("phis", &Predictor::betas_)
       .def(py::pickle(

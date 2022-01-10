@@ -134,13 +134,6 @@ class Predictor:
         npt.NDArray[numpy.float64],
         typing.List[typing.Dict[int, npt.NDArray[numpy.int32]]],
     ]: ...
-    def predict_mf(
-        self,
-        arg0: typing.List[npt.NDArray[numpy.int32]],
-        arg1: typing.List[npt.NDArray[numpy.int32]],
-        arg2: int,
-        arg3: float,
-    ) -> npt.NDArray[numpy.float64]: ...
     def predict_mf_batch(
         self,
         arg0: typing.List[scipy.sparse.csr_matrix[numpy.int32]],

@@ -8,9 +8,6 @@ struct Predictor {
 
   void add_beta(const RealMatrix &beta);
 
-  RealVector predict_mf(std::vector<IntegerVector> nonzeros,
-                        std::vector<IntegerVector> counts, size_t iter,
-                        Real delta) const;
   RealMatrix predict_mf_batch(std::vector<SparseIntegerMatrix> Xs,
                               std::size_t iter, Real delta,
                               size_t n_workers) const;

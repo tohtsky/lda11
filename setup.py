@@ -1,13 +1,15 @@
 import os
 import sys
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import setuptools
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
 __version__ = "0.3.0.0"
-install_requires = ["pybind11>=2.5", "numpy >= 1.22", "tqdm", "scipy>=1.0.0"]
+install_requires = ["numpy >= 1.22", "tqdm", "scipy>=1.0.0"]
+setup_requires = ["pybind11>=2.5", "requests", "setuptools_scm"]
+
 
 eigen_include_dir = os.environ.get("EIGEN3_INCLUDE_DIR", None)
 if eigen_include_dir is None:
@@ -20,7 +22,7 @@ class get_eigen_include(object):
     EIGEN3_URL = "https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.zip"
     EIGEN3_DIRNAME = "eigen-3.3.7"
 
-    def __str__(self):
+    def __str__(self) -> str:
         if eigen_include_dir is not None:
             return eigen_include_dir
 
@@ -55,7 +57,7 @@ class get_pybind_include(object):
     def __init__(self, user=False):
         self.user = user
 
-    def __str__(self):
+    def __str__(self) -> str:
         import pybind11
 
         return pybind11.get_include(self.user)
@@ -85,7 +87,7 @@ ext_modules = [
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
-def has_flag(compiler, flagname):
+def has_flag(compiler, flagname) -> bool:
     """Return a boolean indicating whether a flag name is supported on
     the specified compiler.
     """
@@ -100,7 +102,7 @@ def has_flag(compiler, flagname):
     return True
 
 
-def cpp_flag(compiler):
+def cpp_flag(compiler) -> str:
     """Return the -std=c++[11/14/17] compiler flag.
     The newer version is prefered over c++11 (when it is available).
     """
@@ -116,14 +118,6 @@ def cpp_flag(compiler):
 class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
 
-    c_opts = {
-        "msvc": ["/EHsc"],
-        "unix": [],
-    }
-    l_opts: Dict[str, List[str]] = {
-        "msvc": [],
-        "unix": [],
-    }
     if TEST_BUILD:
         c_opts: Dict[str, List[str]] = {
             "msvc": ["/EHsc"],
@@ -148,7 +142,7 @@ class BuildExt(build_ext):
         c_opts["unix"] += darwin_opts
         l_opts["unix"] += darwin_opts
 
-    def build_extensions(self):
+    def build_extensions(self) -> None:
         ct = self.compiler.compiler_type
         opts = self.c_opts.get(ct, [])
         link_opts = self.l_opts.get(ct, [])
@@ -165,8 +159,13 @@ class BuildExt(build_ext):
         build_ext.build_extensions(self)
 
 
+def local_scheme(version: Any) -> str:
+    return ""
+
+
 setup(
     name="lda11",
+    use_scm_version={"local_scheme": local_scheme},
     version=__version__,
     author="Tomoki Ohtsuki",
     url="https://github.com/tohtsky/lda11",

@@ -40,7 +40,7 @@ def test_llda() -> None:
     A_word_index = np.where(TOPIC_A > 0.1)[0]
     B_word_index = np.where(TOPIC_A < 0.1)[0]
 
-    for A_index, cgs_p in zip([1, 2], [True, False]):
+    for A_index, cgs_p, n_threads in zip([1, 2], [True, False], [1, 2]):
         if A_index == 1:
             language = LabelledLanguage(TOPIC_A, TOPIC_B)
             B_index = 2
@@ -50,7 +50,7 @@ def test_llda() -> None:
 
         X, Y = language.gen_doc(1000)
 
-        llda = LabelledLDA(use_cgs_p=cgs_p).fit(X, Y)
+        llda = LabelledLDA(use_cgs_p=cgs_p, n_workers=n_threads).fit(X, Y)
 
         for a_word in A_word_index:
             for b_word in B_word_index:
@@ -59,7 +59,7 @@ def test_llda() -> None:
 
         A_DOC = np.asarray(([0, 10, 0, 10]), dtype=np.int32)
         for mode in ["mf", "gibbs"]:
-            theta = llda.transform(A_DOC, mode=mode)[0]  # type: ignore
+            theta = llda.transform(A_DOC, mode=mode, n_workers=n_threads)[0]  # type: ignore
             if A_index == 1:
                 assert (theta[1] / theta[2]) > 5
             else:

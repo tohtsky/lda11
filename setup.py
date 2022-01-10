@@ -174,7 +174,7 @@ setup(
     long_description="",
     ext_modules=ext_modules,
     install_requires=install_requires,
-    setup_requires=install_requires,
+    setup_requires=setup_requires,
     cmdclass={"build_ext": BuildExt},
     packages=["lda11"],
     zip_safe=False,

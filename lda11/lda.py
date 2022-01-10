@@ -369,34 +369,16 @@ class MultilingualLDA(LDABase):
         use_cgs_p: bool = True,
         is_phi_symmetric: bool = True,
     ):
-        n_components = int(n_components)
-        assert n_iter >= 1
-        assert n_components >= 1
-        self.n_components = n_components
-
-        self.doc_topic_prior = number_to_array(
-            self.n_components, 1 / float(self.n_components), doc_topic_prior
+        super().__init__(
+            n_components,
+            doc_topic_prior=doc_topic_prior,
+            n_iter=n_iter,
+            optimize_interval=optimize_interval,
+            optimize_burn_in=optimize_burn_in,
+            n_workers=n_workers,
+            use_cgs_p=use_cgs_p,
+            is_phi_symmetric=is_phi_symmetric,
         )
-        self.topic_word_priors_ = None
-        self.is_phi_symmetric = is_phi_symmetric
-        self.n_vocabs: Optional[List[int]] = None
-        self.docstate_ = None
-        self.components_: Optional[int] = None
-        self.n_modals: Optional[int] = None
-
-        self.predictor: Optional[CorePredictor] = None
-        self.use_cgs_p: bool = use_cgs_p
-
-        self.n_iter = n_iter
-        self.optimize_interval = optimize_interval
-        if optimize_interval is not None:
-            if optimize_burn_in is None:
-                optimize_burn_in = n_iter // 2
-            else:
-                optimize_burn_in = optimize_burn_in
-        self.optimize_burn_in = optimize_burn_in
-
-        self.n_workers = n_workers
 
     def fit(self, *X: ValidXType, ll_freq: int = 10) -> "MultilingualLDA":
         self._fit(*X, ll_freq=ll_freq)

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import sparse as sps
 
 from lda11 import MultilingualLDA
 
@@ -7,6 +8,7 @@ from .conftest import Docs
 
 def test_mlda(docs_gen: Docs) -> None:
     (X1, X2), true_theta = docs_gen.gen_doc(1000)
+    X2 = sps.lil_matrix(X2)
     lda = MultilingualLDA(2, n_iter=50, optimize_interval=1, optimize_burn_in=25)
     lda.fit(X1, X2)
     phi1, phi2 = lda.phis
@@ -45,3 +47,26 @@ def test_mlda(docs_gen: Docs) -> None:
                 checked_cnt += 1
                 assert theta_inferred[i, topic1_index] > theta_inferred[i, topic2_index]
         assert checked_cnt > 0
+
+    wdt = lda.word_topic_assignment(X1, X2)
+    assert len(wdt) == 1000
+    for i, wdt_result_doc in enumerate(wdt):
+        theta = wdt_result_doc[0]
+        if (true_theta[i, 0] / true_theta[i, 1]) > 10:
+            assert theta[topic1_index] > theta[topic2_index]
+        m = wdt_result_doc[1]
+        assert len(m) == 2
+        # lang 1
+        lang1_assignment = m[0]
+        for word, topic in lang1_assignment.items():
+            if (topic[topic1_index] / (1e-10 + topic[topic2_index])) > 10:
+                assert word in lang1_topic1_strong_index
+            if (topic[topic2_index] / (1e-10 + topic[topic1_index])) > 10:
+                assert word in lang1_topic2_strong_index
+
+        lang2_assignment = m[1]
+        for word, topic in lang2_assignment.items():
+            if (topic[topic1_index] / (1e-10 + topic[topic2_index])) > 10:
+                assert word in lang2_topic1_strong_index
+            if (topic[topic2_index] / (1e-10 + topic[topic1_index])) > 10:
+                assert word in lang2_topic2_strong_index

@@ -73,6 +73,7 @@ void LDATrainerBase::ChildWorker::sync_topic(
     const Eigen::Ref<IntegerMatrix> &word_topic_global,
     const Eigen::Ref<IntegerMatrix> &doc_topic_global,
     const Eigen::Ref<IntegerVector> &topic_counts) {
+
   word_topic_local = word_topic_global;
   topic_counts_local = topic_counts;
   for (size_t internal_dix = 0; internal_dix < global_indices.size();
@@ -86,7 +87,6 @@ void LDATrainerBase::ChildWorker::do_work(
     Eigen::Ref<IntegerMatrix> word_topic, Eigen::Ref<IntegerMatrix> doc_topic,
     Eigen::Ref<IntegerVector> topic_counts,
     const Eigen::Ref<RealVector> &topic_word_prior) {
-  this->sync_topic(word_topic, doc_topic, topic_counts);
   this->decr_count(word_topic, doc_topic, topic_counts);
   Real eta_sum = topic_word_prior.sum();
   RealVector p_(n_topics_);
@@ -98,8 +98,7 @@ void LDATrainerBase::ChildWorker::do_work(
     size_t global_dix = global_indices[ws.doc_id];
 
     p_ = (word_topic_local.row(ws.word_id).cast<Real>().transpose().array() +
-          topic_word_prior.array())
-             .array() /
+          topic_word_prior(ws.word_id)) /
          (topic_counts_local.cast<Real>().array() + eta_sum) *
          (doc_topic_local.row(ws.doc_id).cast<Real>().transpose().array() +
           parent_->obtain_doc_topic_prior(global_dix).array());
@@ -111,6 +110,7 @@ void LDATrainerBase::ChildWorker::do_work(
     topic_counts_local(ws.topic_id)++;
   }
   this->add_count(word_topic, doc_topic, topic_counts);
+  this->epoch++;
 }
 
 RealMatrix LDATrainerBase::ChildWorker::obtain_phi(
@@ -126,7 +126,7 @@ RealMatrix LDATrainerBase::ChildWorker::obtain_phi(
     topic_counts_local(ws.topic_id)--;
     size_t global_dix = global_indices[ws.doc_id];
     p_ = (word_topic_local.row(ws.word_id).cast<Real>().transpose().array() +
-          topic_word_prior.array())
+          topic_word_prior(ws.word_id))
              .array() /
          (topic_counts_local.cast<Real>().array() + eta_sum) *
          (doc_topic_local.row(ws.doc_id).cast<Real>().transpose().array() +

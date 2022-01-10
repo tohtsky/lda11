@@ -54,12 +54,15 @@ struct LDATrainerBase {
     UrandDevice urand_;
 
     std::vector<WordState> word_states_local;
+
+  private:
     IntegerMatrix doc_topic_local;
     IntegerMatrix word_topic_local;
     IntegerVector topic_counts_local;
 
     std::vector<size_t> global_indices;
     std::unordered_map<size_t, size_t> dix_to_internal_index;
+    int epoch;
   };
 
 protected:

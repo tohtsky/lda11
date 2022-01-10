@@ -7,7 +7,14 @@ from .conftest import Docs
 
 def test_lda(docs_gen: Docs) -> None:
     (X1, _), true_theta = docs_gen.gen_doc(1000)
-    lda = LDA(2, n_iter=50, optimize_interval=1, optimize_burn_in=25, use_cgs_p=False)
+    lda = LDA(
+        2,
+        n_iter=50,
+        optimize_interval=1,
+        optimize_burn_in=25,
+        use_cgs_p=False,
+        n_workers=4,
+    )
     lda.fit(X1)
     phi1 = lda.phi
 

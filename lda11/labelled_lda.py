@@ -54,9 +54,9 @@ class LabelledLDA(LDAPredictorMixin):
             Y = Y.astype(IntegerType)
 
         self.n_components = int(Y.shape[1])
-        self.topic_word_prior = number_to_array(
-            X.shape[1], 1 / float(self.n_components), None
-        )
+        self.topic_word_priors_ = [
+            number_to_array(X.shape[1], 1 / float(self.n_components), None)
+        ]
 
         try:
             count, dix, wix = check_array(X)
@@ -84,7 +84,7 @@ class LabelledLDA(LDAPredictorMixin):
         with tqdm(range(self.n_iter)) as pbar:
             for _ in pbar:
                 docstate.iterate_gibbs(
-                    self.topic_word_prior, doc_topic, word_topic, topic_counts
+                    self.topic_word_priors_[0], doc_topic, word_topic, topic_counts
                 )
 
         doc_topic_prior = self.alpha * np.ones(self.n_components, dtype=RealType)
@@ -93,10 +93,10 @@ class LabelledLDA(LDAPredictorMixin):
         predictor = CorePredictor(self.n_components, doc_topic_prior, 42)
         if self.use_cgs_p:
             phi = docstate.obtain_phi(
-                self.topic_word_prior, doc_topic, word_topic, topic_counts
+                self.topic_word_priors_[0], doc_topic, word_topic, topic_counts
             )
         else:
-            phi = word_topic + self.topic_word_prior[:, np.newaxis]
+            phi = word_topic + self.topic_word_priors_[0][:, np.newaxis]
             phi /= phi.sum(axis=0)[np.newaxis, :]
             phi = phi.transpose()
         predictor.add_beta(phi.transpose())

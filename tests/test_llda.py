@@ -40,7 +40,7 @@ def test_llda() -> None:
     A_word_index = np.where(TOPIC_A > 0.1)[0]
     B_word_index = np.where(TOPIC_A < 0.1)[0]
 
-    for A_index, cgs_p, n_threads in zip([1, 2], [True, False], [1, 2]):
+    for A_index, cgs_p, n_threads in zip([1, 2], [False, True], [1, 2]):
         if A_index == 1:
             language = LabelledLanguage(TOPIC_A, TOPIC_B)
             B_index = 2

@@ -1,9 +1,16 @@
-from gc import collect
-from numbers import Number
-from typing import Dict, List, Literal, NamedTuple, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    NamedTuple,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import numpy as np
-from numpy import integer
 from numpy import typing as npt
 from scipy import sparse as sps
 from tqdm import tqdm
@@ -18,7 +25,7 @@ IntegerType = np.int32
 IndexType = np.uint64
 
 
-ValidXType = Union[sps.spmatrix, np.ndarray]
+ValidXType = Union[sps.spmatrix, npt.NDArray[np.int32], npt.NDArray[np.int64]]
 PriorType = Union[np.ndarray, float, None]
 
 
@@ -33,7 +40,7 @@ def number_to_array(
     default: float,
     arg_: Union[float, None, np.ndarray] = None,
     ensure_symmetry: bool = False,
-) -> np.ndarray:
+) -> npt.NDArray[np.float64]:
     if arg_ is None or isinstance(arg_, float):
         value_ = default if arg_ is None else float(arg_)
         return np.ones(n_components, dtype=RealType) * value_
@@ -85,13 +92,6 @@ def to_valid_csr(X: ValidXType) -> sps.csr_matrix:
 
 
 class LDAPredictorMixin:
-    """
-    self.components_
-    self.n_components
-    self.predictor
-    are needed
-    """
-
     topic_word_priors_: Optional[List[np.ndarray]]
     predictor: Optional[CorePredictor]
 
@@ -104,7 +104,7 @@ class LDAPredictorMixin:
         mf_tolerance: float = 1e-10,
         gibbs_burn_in: int = 10,
         use_cgs_p: bool = True,
-        n_workers=1
+        n_workers: int = 1
     ) -> np.ndarray:
         assert self.topic_word_priors_ is not None
         assert self.predictor is not None
@@ -118,7 +118,7 @@ class LDAPredictorMixin:
             if X is None:
                 Xs_csr.append(
                     sps.csr_matrix(
-                        shape=(shape, self.topic_word_priors_[i].shape[0]),
+                        (shape, self.topic_word_priors_[i].shape[0]),
                         dtype=IntegerType,
                     )
                 )
@@ -129,18 +129,25 @@ class LDAPredictorMixin:
             return self.predictor.predict_gibbs_batch(
                 Xs_csr, n_iter, gibbs_burn_in, random_seed, use_cgs_p, n_workers
             )
-        else:
+        elif mode == "mf":
             return self.predictor.predict_mf_batch(
                 Xs_csr, n_iter, mf_tolerance, n_workers
             )
+        else:
+            raise ValueError('"mode" argument must be either "gibbs" for "mf".')
 
     def word_topic_assignment(
-        self, *Xs, n_iter=100, random_seed=42, gibbs_burn_in=10, use_cgs_p=True
+        self,
+        *Xs: Union[ValidXType, None],
+        n_iter: int = 100,
+        random_seed: int = 42,
+        gibbs_burn_in: int = 10,
+        use_cgs_p: bool = True
     ) -> List[Tuple[np.ndarray, List[Dict[int, np.ndarray]]]]:
         assert self.topic_word_priors_ is not None
         assert self.predictor is not None
         n_domains = len(Xs)
-        shapes = set({X.shape[0] for X in Xs})
+        shapes = set({X.shape[0] for X in Xs if X is not None})
         if len(shapes) != 1:
             raise ValueError("Got different shape for Xs.")
 
@@ -150,8 +157,7 @@ class LDAPredictorMixin:
             if X is None:
                 Xs_csr.append(
                     sps.csr_matrix(
-                        ([], ([], [])),
-                        shape=(shape, self.topic_word_priors_[i].shape[0]),
+                        (shape, self.topic_word_priors_[i].shape[0]), dtype=IntegerType
                     )
                 )
         results = []
@@ -176,7 +182,7 @@ class LDAPredictorMixin:
         return self.predictor.phis
 
 
-class MultipleContextLDA(LDAPredictorMixin):
+class LDABase(LDAPredictorMixin):
     def __init__(
         self,
         n_components: int = 100,
@@ -217,11 +223,7 @@ class MultipleContextLDA(LDAPredictorMixin):
 
         self.n_workers = n_workers
 
-    def fit(self, *X, **kwargs):
-        self._fit(*X, **kwargs)
-        return self
-
-    def _fit(self, *Xs: ValidXType, ll_freq=10) -> np.ndarray:
+    def _fit(self, *Xs: ValidXType, ll_freq: int = 10) -> npt.NDArray[IntegerType]:
         """
         Xs should be a list of contents.
         All entries must have the same shape[0].
@@ -247,6 +249,8 @@ class MultipleContextLDA(LDAPredictorMixin):
                     ensure_symmetry=True,
                 )
             )
+        if n_rows is None:
+            raise ValueError("At least one doc-term matrix must be given.")
 
         doc_topic: np.ndarray = np.zeros((n_rows, self.n_components), dtype=IntegerType)
 
@@ -353,7 +357,53 @@ class MultipleContextLDA(LDAPredictorMixin):
         return doc_topic
 
 
-class LDA(MultipleContextLDA):
+class MultilingualLDA(LDABase):
+    def __init__(
+        self,
+        n_components: int = 100,
+        doc_topic_prior: PriorType = None,
+        n_iter: int = 1000,
+        optimize_interval: Optional[int] = None,
+        optimize_burn_in: Optional[int] = None,
+        n_workers: int = 1,
+        use_cgs_p: bool = True,
+        is_phi_symmetric: bool = True,
+    ):
+        n_components = int(n_components)
+        assert n_iter >= 1
+        assert n_components >= 1
+        self.n_components = n_components
+
+        self.doc_topic_prior = number_to_array(
+            self.n_components, 1 / float(self.n_components), doc_topic_prior
+        )
+        self.topic_word_priors_ = None
+        self.is_phi_symmetric = is_phi_symmetric
+        self.n_vocabs: Optional[List[int]] = None
+        self.docstate_ = None
+        self.components_: Optional[int] = None
+        self.n_modals: Optional[int] = None
+
+        self.predictor: Optional[CorePredictor] = None
+        self.use_cgs_p: bool = use_cgs_p
+
+        self.n_iter = n_iter
+        self.optimize_interval = optimize_interval
+        if optimize_interval is not None:
+            if optimize_burn_in is None:
+                optimize_burn_in = n_iter // 2
+            else:
+                optimize_burn_in = optimize_burn_in
+        self.optimize_burn_in = optimize_burn_in
+
+        self.n_workers = n_workers
+
+    def fit(self, *X: ValidXType, ll_freq: int = 10) -> "MultilingualLDA":
+        self._fit(*X, ll_freq=ll_freq)
+        return self
+
+
+class LDA(LDABase):
     pass
 
     def __init__(
@@ -379,8 +429,8 @@ class LDA(MultipleContextLDA):
             is_phi_symmetric=is_phi_symmetric,
         )
 
-    def fit(self, X, **kwargs):
-        super(LDA, self).fit(X, **kwargs)
+    def fit(self, X: ValidXType, ll_freq: int = 10) -> "LDA":
+        self._fit(X, ll_freq=ll_freq)
         return self
 
     @property

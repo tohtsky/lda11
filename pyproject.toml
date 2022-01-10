@@ -13,3 +13,14 @@ include_trailing_comma = true
 line_length = 88
 multi_line_output = 3
 use_parentheses = true
+
+[tool.mypy]
+disallow_untyped_defs = true
+exclude = []
+ignore_missing_imports = true
+plugins = "numpy.typing.mypy_plugin"
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+
+# mypy per-module options:

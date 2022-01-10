@@ -1,4 +1,7 @@
+from typing import Optional
+
 import numpy as np
+from numpy import typing as npt
 from scipy import sparse as sps
 from tqdm import tqdm
 
@@ -9,6 +12,7 @@ from .lda import (
     IntegerType,
     LDAPredictorMixin,
     RealType,
+    ValidXType,
     check_array,
     number_to_array,
 )
@@ -17,47 +21,41 @@ from .lda import (
 class LabelledLDA(LDAPredictorMixin):
     def __init__(
         self,
-        alpha=1e-2,
-        epsilon=1e-30,
-        topic_word_prior=None,
-        add_dummy_topic=False,
-        n_iter=1000,
-        n_workers=1,
-        use_cgs_p=True,
+        alpha: float = 1e-2,
+        epsilon: float = 1e-30,
+        n_iter: int = 1000,
+        n_workers: int = 1,
+        use_cgs_p: bool = True,
     ):
-        self.n_components = None
-        self.topic_word_prior = topic_word_prior
+        self.n_components_: Optional[int] = None
         self.alpha = alpha
         self.epsilon = 1e-20
         self.n_vocabs = None
         self.docstate_ = None
-        self.components_ = None
+        self.components_: Optional[npt.NDArray[np.int32]] = None
         self.predictor = None
         self.n_workers = n_workers
         self.epsilon = epsilon
-        self.add_dummy_topic = add_dummy_topic
         self.n_iter = n_iter
         self.use_cgs_p = use_cgs_p
 
-    def fit(self, X, Y):
-        self._fit(X, Y)
+    def fit(self, X: ValidXType, Y: ValidXType) -> "LabelledLDA":
+        self._fit_llda(X, Y)
         return self
 
-    def fit_transform(self, X, Y, **kwargs):
-        result = self._fit(X, **kwargs) + self.doc_topic_prior[np.newaxis, :]
-        result /= result.sum(axis=1)[:, np.newaxis]
-        return result
-
-    def _fit(self, X, Y, ll_freq: int = 10):
+    def _fit_llda(
+        self,
+        X: ValidXType,
+        Y: ValidXType,
+    ) -> npt.NDArray[np.int32]:
         if not sps.issparse(Y):
             Y = sps.csr_matrix(Y).astype(IntegerType)
         else:
             Y = Y.astype(IntegerType)
 
-        self.n_components = Y.shape[1]
-        ones_topic = np.ones(self.n_components, dtype=RealType)
+        self.n_components = int(Y.shape[1])
         self.topic_word_prior = number_to_array(
-            X.shape[1], 1 / float(self.n_components), self.topic_word_prior
+            X.shape[1], 1 / float(self.n_components), None
         )
 
         try:
@@ -107,6 +105,6 @@ class LabelledLDA(LDAPredictorMixin):
         return doc_topic
 
     @property
-    def phi(self):
+    def phi(self) -> npt.NDArray[np.float64]:
         assert self.predictor is not None
         return self.predictor.phis[0]

@@ -16,6 +16,7 @@ jobs:
       - name: Build lda11
         run: |
           pip install --upgrade pip
+          pip install numpy scipy
           sudo apt-get install lcov
           TEST_BUILD=true python setup.py develop
       - name: Run pytest

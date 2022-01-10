@@ -21,7 +21,7 @@ LDATrainerBase::LDATrainerBase(Eigen::Ref<IntegerVector> counts,
 
   if (n_workers == 0) {
     throw std::invalid_argument("n_workers has to be strictly positive.");
-  } else if (n_workers == 1) {
+  } else if (n_workers == 1u) {
     for (size_t i = 0; i < n_; i++) {
       size_t c = counts(i);
       size_t dix = dixs(i);
@@ -43,7 +43,7 @@ LDATrainerBase::LDATrainerBase(Eigen::Ref<IntegerVector> counts,
       size_t assigned;
       if (dix_seen.find(dix) == dix_seen.end()) {
         assigned = std::floor(urand_.rand() * n_workers);
-        assigned = assigned < n_workers - 1 ? assigned : n_workers - 1;
+        assigned = assigned < (n_workers - 1) ? assigned : n_workers - 1;
         dix_seen.insert({dix, assigned});
         children[assigned]->add_doc(dix);
       } else {
@@ -92,8 +92,7 @@ void LDATrainerBase::iterate_gibbs(Eigen::Ref<RealVector> topic_word_prior,
       topic_counts(ws.topic_id)--;
 
       p_ = (word_topic.row(ws.word_id).cast<Real>().transpose().array() +
-            topic_word_prior.array())
-               .array() /
+            topic_word_prior(ws.word_id)) /
            (topic_counts.cast<Real>().array() + eta_sum) *
            (doc_topic.row(ws.doc_id).cast<Real>().transpose().array() +
             obtain_doc_topic_prior(ws.doc_id).array());
@@ -106,6 +105,9 @@ void LDATrainerBase::iterate_gibbs(Eigen::Ref<RealVector> topic_word_prior,
     }
   } else {
     std::vector<std::thread> workers;
+    for (auto &child : children) {
+      child->sync_topic(word_topic, doc_topic, topic_counts);
+    }
     for (auto &child : children) {
       workers.emplace_back([&child, &word_topic, &doc_topic, &topic_counts,
                             &topic_word_prior] {
@@ -135,7 +137,7 @@ LDATrainerBase::obtain_phi(const Eigen::Ref<RealVector> &topic_word_prior,
       word_topic(ws.word_id, ws.topic_id)--;
       topic_counts(ws.topic_id)--;
       p_ = (word_topic.row(ws.word_id).cast<Real>().transpose().array() +
-            topic_word_prior.array())
+            topic_word_prior(ws.word_id))
                .array() /
            (topic_counts.cast<Real>().array() + eta_sum) *
            (doc_topic.row(ws.doc_id).cast<Real>().transpose().array() +

@@ -8,7 +8,6 @@ from tqdm import tqdm
 from ._lda import LabelledLDATrainer
 from ._lda import Predictor as CorePredictor
 from .lda import (
-    IndexType,
     IntegerType,
     LDAPredictorMixin,
     RealType,

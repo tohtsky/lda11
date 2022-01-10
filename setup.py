@@ -77,12 +77,12 @@ ext_modules = [
     Extension(
         "lda11._lda",
         [
-            "src/wrapper.cpp",
-            "src/predictor.cpp",
-            "src/trainer_base.cpp",
-            "src/trainer.cpp",
-            "src/child_worker.cpp",
-            "src/labelled_lda.cpp",
+            "cpp_sources/wrapper.cpp",
+            "cpp_sources/predictor.cpp",
+            "cpp_sources/trainer_base.cpp",
+            "cpp_sources/trainer.cpp",
+            "cpp_sources/child_worker.cpp",
+            "cpp_sources/labelled_lda.cpp",
         ],
         include_dirs=[
             # Path to pybind11 headers
@@ -187,7 +187,8 @@ setup(
     install_requires=install_requires,
     setup_requires=setup_requires,
     cmdclass={"build_ext": BuildExt},
-    packages=["lda11", "lda11._lda"],
+    packages=find_packages("src"),
     include_package_data=True,
     zip_safe=False,
+    package_dir={"": "src"},
 )

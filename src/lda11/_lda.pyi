@@ -1,6 +1,5 @@
 """Backend C++ inplementation for lda11."""
 from __future__ import annotations
-import lda11._lda
 import typing
 import numpy
 import numpy.typing as npt

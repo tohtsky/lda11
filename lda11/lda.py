@@ -337,12 +337,12 @@ class LDABase(LDAPredictorMixin):
                         topic_word_prior[:] = topic_word_prior_new
                         self.doc_topic_prior = doc_topic_prior_new
                         docstate.set_doc_topic_prior(doc_topic_prior_new)
-        self.topic_word_priors = topic_word_priors_canonical
+        self.topic_word_priors_ = topic_word_priors_canonical
 
         predictor = CorePredictor(self.n_components, self.doc_topic_prior, 42)
 
         for i, (twp, wt, docstate) in enumerate(
-            zip(self.topic_word_priors, word_topics, docstates)
+            zip(self.topic_word_priors_, word_topics, docstates)
         ):
             if self.use_cgs_p:
                 phi = docstate.obtain_phi(twp, doc_topic, wt, topic_counts)

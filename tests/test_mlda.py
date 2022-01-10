@@ -45,7 +45,7 @@ def test_mlda(docs_gen: Docs) -> None:
         checked_cnt = 0
         theta_inferred = lda.transform(X1, X2, mode=algo)  # type: ignore
         for i in range(X1.shape[0]):
-            if (true_theta[i, 0] / true_theta[i, 1]) > 10:
+            if (true_theta[i, 0] / true_theta[i, 1]) > 10 and (X1[i].sum() > 5):
                 checked_cnt += 1
                 assert theta_inferred[i, topic1_index] > theta_inferred[i, topic2_index]
         assert checked_cnt > 0

@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
@@ -90,13 +91,13 @@ class LDAPredictorMixin:
         self,
         *Xs: Union[ValidXType, None],
         n_iter: int = 100,
-        random_seed: int = 42,
+        random_seed: int = 0,
         mode: Literal["gibbs", "mf"] = "gibbs",
         mf_tolerance: float = 1e-10,
         gibbs_burn_in: int = 10,
         use_cgs_p: bool = True,
         n_workers: int = 1
-    ) -> np.ndarray:
+    ) -> npt.NDArray[RealType]:
         assert self.topic_word_priors_ is not None
         assert self.predictor is not None
         shapes = set({int(X.shape[0]) for X in Xs if X is not None})
@@ -131,7 +132,7 @@ class LDAPredictorMixin:
         self,
         *Xs: Union[ValidXType, None],
         n_iter: int = 100,
-        random_seed: int = 42,
+        random_seed: int = 0,
         gibbs_burn_in: int = 10,
         use_cgs_p: bool = True
     ) -> List[Tuple[np.ndarray, List[Dict[int, np.ndarray]]]]:
@@ -168,7 +169,7 @@ class LDAPredictorMixin:
         return results
 
     @property
-    def phis(self) -> List[np.ndarray]:
+    def phis(self) -> List[npt.NDArray[RealType]]:
         assert self.predictor is not None
         return self.predictor.phis
 
@@ -184,6 +185,7 @@ class LDABase(LDAPredictorMixin):
         n_workers: int = 1,
         use_cgs_p: bool = True,
         is_phi_symmetric: bool = True,
+        random_seed: Optional[int] = 0,
     ):
         n_components = int(n_components)
         assert n_iter >= 1
@@ -213,6 +215,9 @@ class LDABase(LDAPredictorMixin):
         self.optimize_burn_in = optimize_burn_in
 
         self.n_workers = n_workers
+        if random_seed is None:
+            random_seed = random.randint(-(2 ** 31), 2 ** 31 - 1)
+        self.random_seed = random_seed
 
     def _fit(self, *Xs: ValidXType, ll_freq: int = 10) -> npt.NDArray[IntegerType]:
         """
@@ -222,7 +227,7 @@ class LDABase(LDAPredictorMixin):
 
         self.modality = len(Xs)
 
-        topic_word_priors_canonical: List[np.ndarray] = []
+        topic_word_priors_canonical: List[npt.NDArray[RealType]] = []
 
         doc_tuples: List[LDAInput] = []
 
@@ -243,11 +248,15 @@ class LDABase(LDAPredictorMixin):
         if n_rows is None:
             raise ValueError("At least one doc-term matrix must be given.")
 
-        doc_topic: np.ndarray = np.zeros((n_rows, self.n_components), dtype=IntegerType)
+        doc_topic: npt.NDArray[IntegerType] = np.zeros(
+            (n_rows, self.n_components), dtype=IntegerType
+        )
 
-        topic_counts = np.zeros(self.n_components, dtype=IntegerType)
+        topic_counts: npt.NDArray[IntegerType] = np.zeros(
+            self.n_components, dtype=IntegerType
+        )
 
-        word_topics = [
+        word_topics: List[npt.NDArray[IntegerType]] = [
             np.zeros((X.shape[1], self.n_components), dtype=IntegerType) for X in Xs
         ]
 
@@ -259,12 +268,12 @@ class LDABase(LDAPredictorMixin):
                 dix,
                 wix,
                 self.n_components,
-                42,
+                self.random_seed,
                 self.n_workers,
             )
             docstates.append(docstate)
             docstate.initialize(word_topic, doc_topic, topic_counts)
-        doc_length: np.ndarray = doc_topic.sum(axis=1).astype(IntegerType)
+        doc_length: npt.NDArray[IntegerType] = doc_topic.sum(axis=1).astype(IntegerType)
 
         ll = log_likelihood_doc_topic(self.doc_topic_prior, doc_topic, doc_length)
         for topic_word_prior, word_topic, docstate in zip(
@@ -330,7 +339,9 @@ class LDABase(LDAPredictorMixin):
                         docstate.set_doc_topic_prior(doc_topic_prior_new)
         self.topic_word_priors_ = topic_word_priors_canonical
 
-        predictor = CorePredictor(self.n_components, self.doc_topic_prior, 42)
+        predictor = CorePredictor(
+            self.n_components, self.doc_topic_prior, self.random_seed
+        )
 
         for i, (twp, wt, docstate) in enumerate(
             zip(self.topic_word_priors_, word_topics, docstates)
@@ -349,59 +360,12 @@ class LDABase(LDAPredictorMixin):
 
 
 class MultilingualLDA(LDABase):
-    def __init__(
-        self,
-        n_components: int = 100,
-        doc_topic_prior: PriorType = None,
-        n_iter: int = 1000,
-        optimize_interval: Optional[int] = None,
-        optimize_burn_in: Optional[int] = None,
-        n_workers: int = 1,
-        use_cgs_p: bool = True,
-        is_phi_symmetric: bool = True,
-    ):
-        super().__init__(
-            n_components,
-            doc_topic_prior=doc_topic_prior,
-            n_iter=n_iter,
-            optimize_interval=optimize_interval,
-            optimize_burn_in=optimize_burn_in,
-            n_workers=n_workers,
-            use_cgs_p=use_cgs_p,
-            is_phi_symmetric=is_phi_symmetric,
-        )
-
     def fit(self, *X: ValidXType, ll_freq: int = 10) -> "MultilingualLDA":
         self._fit(*X, ll_freq=ll_freq)
         return self
 
 
 class LDA(LDABase):
-    pass
-
-    def __init__(
-        self,
-        n_components: int = 100,
-        doc_topic_prior: Optional[np.ndarray] = None,
-        n_iter: int = 1000,
-        optimize_burn_in: Optional[int] = None,
-        optimize_interval: Optional[int] = None,
-        n_workers: int = 1,
-        use_cgs_p: bool = True,
-        is_phi_symmetric: bool = True,
-    ):
-
-        super(LDA, self).__init__(
-            n_components=n_components,
-            doc_topic_prior=doc_topic_prior,
-            n_iter=n_iter,
-            optimize_burn_in=optimize_burn_in,
-            optimize_interval=optimize_interval,
-            n_workers=n_workers,
-            use_cgs_p=use_cgs_p,
-            is_phi_symmetric=is_phi_symmetric,
-        )
-
     def fit(self, X: ValidXType, ll_freq: int = 10) -> "LDA":
         self._fit(X, ll_freq=ll_freq)
         return self

@@ -27,10 +27,10 @@ class Docs:
         ]
         thetas: List[np.ndarray] = []
         for _ in range(n_docs):
-            theta = rns.dirichlet(np.asfarray([1.0, 1.0]))
+            theta = rns.dirichlet(np.asfarray([0.2, 0.2]))
             thetas.append(theta)
             for lind, language in enumerate(self.languages):
-                cnt = rns.poisson(3)
+                cnt = rns.poisson(5)
                 wdist = (
                     float(theta[0]) * language.topic_1
                     + float(theta[1]) * language.topic_2

@@ -6,12 +6,14 @@ import setuptools
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = "0.2.2.0"
-install_requires = ["pybind11>=2.5", "numpy >= 1.11", "tqdm", "scipy>=1.0.0"]
+__version__ = "0.3.0.0"
+install_requires = ["pybind11>=2.5", "numpy >= 1.22", "tqdm", "scipy>=1.0.0"]
 
 eigen_include_dir = os.environ.get("EIGEN3_INCLUDE_DIR", None)
 if eigen_include_dir is None:
     install_requires.append("requests")
+
+TEST_BUILD = os.environ.get("TEST_BUILD", None) is not None
 
 
 class get_eigen_include(object):
@@ -122,6 +124,24 @@ class BuildExt(build_ext):
         "msvc": [],
         "unix": [],
     }
+    if TEST_BUILD:
+        c_opts: Dict[str, List[str]] = {
+            "msvc": ["/EHsc"],
+            "unix": ["-O0", "-coverage", "-g"],
+        }
+        l_opts: Dict[str, List[str]] = {
+            "msvc": [],
+            "unix": ["-coverage"],
+        }
+    else:
+        c_opts = {
+            "msvc": ["/EHsc"],
+            "unix": [],
+        }
+        l_opts = {
+            "msvc": [],
+            "unix": [],
+        }
 
     if sys.platform == "darwin":
         darwin_opts = ["-stdlib=libc++", "-mmacosx-version-min=10.7"]

@@ -40,7 +40,7 @@ def test_llda() -> None:
     A_word_index = np.where(TOPIC_A > 0.1)[0]
     B_word_index = np.where(TOPIC_A < 0.1)[0]
 
-    for A_index in [1, 2]:
+    for A_index, cgs_p in zip([1, 2], [True, False]):
         if A_index == 1:
             language = LabelledLanguage(TOPIC_A, TOPIC_B)
             B_index = 2
@@ -50,7 +50,7 @@ def test_llda() -> None:
 
         X, Y = language.gen_doc(1000)
 
-        llda = LabelledLDA().fit(X, Y)
+        llda = LabelledLDA(use_cgs_p=cgs_p).fit(X, Y)
 
         for a_word in A_word_index:
             for b_word in B_word_index:

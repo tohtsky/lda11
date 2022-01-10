@@ -22,7 +22,7 @@ jobs:
       - name: mypy
         run: |
           pip install mypy
-          mypy lda11 --ignore-missing-imports
+          mypy src/lda11 --ignore-missing-imports
       - name: Run pytest
         run: |
           pip install pytest pytest-cov

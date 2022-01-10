@@ -112,6 +112,7 @@ jobs:
             name: win_amd64
             architecture: x64
             cibw:
+              skip: "cp36*"
               build: "cp*win_amd64"
               env: "CL='/arch:AVX'"
 

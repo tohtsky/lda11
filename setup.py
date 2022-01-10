@@ -24,8 +24,8 @@ TEST_BUILD = os.environ.get("TEST_BUILD", None) is not None
 
 
 class get_eigen_include(object):
-    EIGEN3_URL = "https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.zip"
-    EIGEN3_DIRNAME = "eigen-3.3.7"
+    EIGEN3_URL = "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip"
+    EIGEN3_DIRNAME = "eigen-3.4.0"
 
     def __str__(self) -> str:
         if eigen_include_dir is not None:

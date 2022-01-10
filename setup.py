@@ -8,10 +8,10 @@ from setuptools.command.build_ext import build_ext
 
 __version__ = "0.3.0.0"
 install_requires = [
-    "numpy>=1.22",
+    "numpy>=1.21",
     "tqdm",
     "scipy>=1.0.0",
-    "typing_extensions>=3.0",
+    "typing_extensions>=3.10",
 ]
 setup_requires = ["pybind11>=2.5", "requests", "setuptools_scm"]
 

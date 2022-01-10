@@ -16,6 +16,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 #include <vector>
@@ -216,7 +217,12 @@ Real log_likelihood_doc_topic(const Eigen::Ref<RealVector> &doc_topic_prior,
 }
 
 PYBIND11_MODULE(_lda, m) {
-  m.doc() = "Backend C++ inplementation for lda11.";
+  std::stringstream doc_stream;
+  doc_stream << "Backend C++ implementation for lda11." << std::endl
+             << "Built to use" << std::endl
+             << "\t" << Eigen::SimdInstructionSetsInUse();
+
+  m.doc() = doc_stream.str();
   py::class_<LDATrainer>(m, "LDATrainer")
       .def(py::init<const RealVector &, Eigen::Ref<IntegerVector>,
                     Eigen::Ref<IndexVector>, Eigen::Ref<IndexVector>,

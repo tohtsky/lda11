@@ -1,19 +1,10 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Literal,
-    NamedTuple,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 from numpy import typing as npt
 from scipy import sparse as sps
 from tqdm import tqdm
+from typing_extensions import Literal
 
 from ._lda import LDATrainer
 from ._lda import Predictor as CorePredictor

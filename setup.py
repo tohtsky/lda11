@@ -1,22 +1,38 @@
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import sys
-import setuptools
 import os
+import sys
+from pathlib import Path
+from typing import Any, Dict, List
 
-__version__ = "0.2.2.0"
-install_requires = ["pybind11>=2.5", "numpy >= 1.11", "tqdm", "scipy>=1.0.0"]
+import setuptools
+from setuptools import Extension, find_packages, setup
+from setuptools.command.build_ext import build_ext
+
+SETUP_DIRECTORY = Path(__file__).resolve().parent
+with (SETUP_DIRECTORY / "README.md").open() as ifs:
+    LONG_DESCRIPTION = ifs.read()
+
+__version__ = "0.3.0.0"
+install_requires = [
+    "numpy>=1.21",
+    "tqdm",
+    "scipy>=1.0.0",
+    "typing_extensions>=3.10",
+]
+setup_requires = ["pybind11>=2.5", "requests", "setuptools_scm"]
+
 
 eigen_include_dir = os.environ.get("EIGEN3_INCLUDE_DIR", None)
 if eigen_include_dir is None:
     install_requires.append("requests")
 
+TEST_BUILD = os.environ.get("TEST_BUILD", None) is not None
+
 
 class get_eigen_include(object):
-    EIGEN3_URL = "https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.zip"
-    EIGEN3_DIRNAME = "eigen-3.3.7"
+    EIGEN3_URL = "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip"
+    EIGEN3_DIRNAME = "eigen-3.4.0"
 
-    def __str__(self):
+    def __str__(self) -> str:
         if eigen_include_dir is not None:
             return eigen_include_dir
 
@@ -27,8 +43,9 @@ class get_eigen_include(object):
             return target_dir
 
         download_target_dir = os.path.join(basedir, "eigen3.zip")
-        import requests
         import zipfile
+
+        import requests
 
         response = requests.get(self.EIGEN3_URL, stream=True)
         with open(download_target_dir, "wb") as ofs:
@@ -45,12 +62,12 @@ class get_pybind_include(object):
     """Helper class to determine the pybind11 include path
     The purpose of this class is to postpone importing pybind11
     until it is actually installed, so that the ``get_include()``
-    method can be invoked. """
+    method can be invoked."""
 
     def __init__(self, user=False):
         self.user = user
 
-    def __str__(self):
+    def __str__(self) -> str:
         import pybind11
 
         return pybind11.get_include(self.user)
@@ -60,12 +77,12 @@ ext_modules = [
     Extension(
         "lda11._lda",
         [
-            "src/wrapper.cpp",
-            "src/predictor.cpp",
-            "src/trainer_base.cpp",
-            "src/trainer.cpp",
-            "src/child_worker.cpp",
-            "src/labelled_lda.cpp",
+            "cpp_sources/wrapper.cpp",
+            "cpp_sources/predictor.cpp",
+            "cpp_sources/trainer_base.cpp",
+            "cpp_sources/trainer.cpp",
+            "cpp_sources/child_worker.cpp",
+            "cpp_sources/labelled_lda.cpp",
         ],
         include_dirs=[
             # Path to pybind11 headers
@@ -80,7 +97,7 @@ ext_modules = [
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
-def has_flag(compiler, flagname):
+def has_flag(compiler, flagname) -> bool:
     """Return a boolean indicating whether a flag name is supported on
     the specified compiler.
     """
@@ -95,7 +112,7 @@ def has_flag(compiler, flagname):
     return True
 
 
-def cpp_flag(compiler):
+def cpp_flag(compiler) -> str:
     """Return the -std=c++[11/14/17] compiler flag.
     The newer version is prefered over c++11 (when it is available).
     """
@@ -111,21 +128,31 @@ def cpp_flag(compiler):
 class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
 
-    c_opts = {
-        "msvc": ["/EHsc"],
-        "unix": [],
-    }
-    l_opts = {
-        "msvc": [],
-        "unix": [],
-    }
+    if TEST_BUILD:
+        c_opts: Dict[str, List[str]] = {
+            "msvc": ["/EHsc"],
+            "unix": ["-O0", "-coverage", "-g"],
+        }
+        l_opts: Dict[str, List[str]] = {
+            "msvc": [],
+            "unix": ["-coverage"],
+        }
+    else:
+        c_opts = {
+            "msvc": ["/EHsc"],
+            "unix": [],
+        }
+        l_opts = {
+            "msvc": [],
+            "unix": [],
+        }
 
     if sys.platform == "darwin":
         darwin_opts = ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
         c_opts["unix"] += darwin_opts
         l_opts["unix"] += darwin_opts
 
-    def build_extensions(self):
+    def build_extensions(self) -> None:
         ct = self.compiler.compiler_type
         opts = self.c_opts.get(ct, [])
         link_opts = self.l_opts.get(ct, [])
@@ -142,18 +169,26 @@ class BuildExt(build_ext):
         build_ext.build_extensions(self)
 
 
+def local_scheme(version: Any) -> str:
+    return ""
+
+
 setup(
     name="lda11",
+    use_scm_version={"local_scheme": local_scheme},
     version=__version__,
     author="Tomoki Ohtsuki",
     url="https://github.com/tohtsky/lda11",
-    author_email="tomoki.ohtsuki129@gmail.com",
+    author_email="tomoki.ohtsuki.19937@outook.jp",
     description="Yet another CGS sampler for Latent Dirichlet Allocation.",
-    long_description="",
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type="text/markdown",
     ext_modules=ext_modules,
     install_requires=install_requires,
-    setup_requires=install_requires,
+    setup_requires=setup_requires,
     cmdclass={"build_ext": BuildExt},
-    packages=["lda11"],
+    packages=find_packages("src"),
+    include_package_data=True,
     zip_safe=False,
+    package_dir={"": "src"},
 )

@@ -16,6 +16,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 #include <vector>
@@ -145,8 +146,6 @@ Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
   }
   Real alpha_current(alpha_start);
 
-  Real numerator;
-
   vector<Real> doc_length;
   vector<Real> doc_length_freq;
 
@@ -183,7 +182,6 @@ Real learn_dirichlet_symmetric(const Eigen::Ref<IntegerMatrix> &counts,
   }
   for (size_t it = 0; it < iteration; it++) {
     Real alpha_sum = n_topic * alpha_current;
-    numerator = 0;
     Real denominator =
         ((vector_to_eigen(doc_length).array() + alpha_sum).digamma() -
          digamma(alpha_sum))
@@ -219,7 +217,12 @@ Real log_likelihood_doc_topic(const Eigen::Ref<RealVector> &doc_topic_prior,
 }
 
 PYBIND11_MODULE(_lda, m) {
-  m.doc() = "Backend C++ inplementation for lda11.";
+  std::stringstream doc_stream;
+  doc_stream << "Backend C++ implementation for lda11." << std::endl
+             << "Built to use" << std::endl
+             << "\t" << Eigen::SimdInstructionSetsInUse();
+
+  m.doc() = doc_stream.str();
   py::class_<LDATrainer>(m, "LDATrainer")
       .def(py::init<const RealVector &, Eigen::Ref<IntegerVector>,
                     Eigen::Ref<IndexVector>, Eigen::Ref<IndexVector>,
@@ -252,7 +255,6 @@ PYBIND11_MODULE(_lda, m) {
       .def("predict_gibbs_with_word_assignment",
            &Predictor::predict_gibbs_with_word_assignment)
       .def("predict_gibbs_batch", &Predictor::predict_gibbs_batch)
-      .def("predict_mf", &Predictor::predict_mf)
       .def("predict_mf_batch", &Predictor::predict_mf_batch)
       .def_readonly("phis", &Predictor::betas_)
       .def(py::pickle(

@@ -106,49 +106,6 @@ RealMatrix Predictor::predict_mf_batch(std::vector<SparseIntegerMatrix> Xs,
   }
   return result;
 }
-RealVector Predictor::predict_mf(std::vector<IntegerVector> nonzeros,
-                                 std::vector<IntegerVector> counts,
-                                 std::size_t iter, Real delta) const {
-  size_t dim_buffer = 0;
-  for (size_t n = 0; n < n_domains_; n++) {
-    dim_buffer += counts[n].sum();
-  }
-  if (dim_buffer == 0) {
-    return doc_topic_prior_ / doc_topic_prior_.sum();
-  }
-  RealMatrix current_prob(dim_buffer, n_topics_);
-  current_prob.array() = 0;
-  RealMatrix new_prob(dim_buffer, n_topics_);
-  RealMatrix beta_rel(dim_buffer, n_topics_);
-
-  size_t current_iter = 0;
-  for (size_t n = 0; n < n_domains_; n++) {
-    size_t n_unique_words = nonzeros[n].rows();
-    for (size_t j = 0; j < n_unique_words; j++) {
-      size_t wid = nonzeros[n](j);
-      size_t count = counts[n][j];
-      for (size_t k = 0; k < count; k++) {
-        beta_rel.row(current_iter) = betas_[n].row(wid);
-        current_iter++;
-      }
-    }
-  }
-
-  for (size_t i = 0; i <= iter; i++) {
-    new_prob = -current_prob;
-    new_prob.rowwise() += current_prob.colwise().sum();
-    new_prob.rowwise() += doc_topic_prior_.transpose();
-    new_prob.array() = new_prob.array() * beta_rel.array();
-    new_prob.array().colwise() /= new_prob.array().rowwise().sum();
-    double diff = (new_prob - current_prob).array().abs().sum();
-    current_prob = new_prob;
-    if (diff < delta)
-      break;
-  }
-  RealVector theta = current_prob.array().colwise().sum().transpose();
-  theta /= theta.sum();
-  return theta;
-}
 
 RealVector Predictor::predict_gibbs_write_assignment(
     const std::vector<IntegerVector> &nonzeros,

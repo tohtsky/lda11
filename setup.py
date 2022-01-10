@@ -3,7 +3,7 @@ import sys
 from typing import Any, Dict, List
 
 import setuptools
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 __version__ = "0.3.0.0"
@@ -181,6 +181,6 @@ setup(
     install_requires=install_requires,
     setup_requires=setup_requires,
     cmdclass={"build_ext": BuildExt},
-    packages=["lda11"],
+    packages=find_packages(),
     zip_safe=False,
 )

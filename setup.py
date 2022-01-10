@@ -1,10 +1,15 @@
 import os
 import sys
+from pathlib import Path
 from typing import Any, Dict, List
 
 import setuptools
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
+
+SETUP_DIRECTORY = Path(__file__).resolve().parent
+with (SETUP_DIRECTORY / "README.md").open() as ifs:
+    LONG_DESCRIPTION = ifs.read()
 
 __version__ = "0.3.0.0"
 install_requires = [
@@ -174,13 +179,14 @@ setup(
     version=__version__,
     author="Tomoki Ohtsuki",
     url="https://github.com/tohtsky/lda11",
-    author_email="tomoki.ohtsuki129@gmail.com",
+    author_email="tomoki.ohtsuki.19937@outook.jp",
     description="Yet another CGS sampler for Latent Dirichlet Allocation.",
-    long_description="",
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type="text/markdown",
     ext_modules=ext_modules,
     install_requires=install_requires,
     setup_requires=setup_requires,
     cmdclass={"build_ext": BuildExt},
     packages=find_packages(),
-    zip_safe=False,
+    include_package_data=True,
 )

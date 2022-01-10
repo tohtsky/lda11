@@ -187,6 +187,7 @@ setup(
     install_requires=install_requires,
     setup_requires=setup_requires,
     cmdclass={"build_ext": BuildExt},
-    packages=find_packages(),
+    packages=["lda11", "lda11._lda"],
     include_package_data=True,
+    zip_safe=False,
 )

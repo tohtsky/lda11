@@ -22,8 +22,6 @@ setup_requires = ["pybind11>=2.5", "requests", "setuptools_scm"]
 
 
 eigen_include_dir = os.environ.get("EIGEN3_INCLUDE_DIR", None)
-if eigen_include_dir is None:
-    install_requires.append("requests")
 
 TEST_BUILD = os.environ.get("TEST_BUILD", None) is not None
 
